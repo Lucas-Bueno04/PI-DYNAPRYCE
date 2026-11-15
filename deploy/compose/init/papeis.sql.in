@@ -1,0 +1,6 @@
+SET password_encryption = 'scram-sha-256';
+CREATE ROLE dynaprice_migrador LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD :'migrador';
+CREATE ROLE dynaprice_app LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE PASSWORD :'app';
+CREATE ROLE dynaprice_fila NOLOGIN NOSUPERUSER NOBYPASSRLS;
+GRANT dynaprice_fila TO dynaprice_migrador;
+CREATE DATABASE dynaprice OWNER dynaprice_migrador;
