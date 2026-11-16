@@ -1,0 +1,98 @@
+# Ambiente local (F1.7): banco, migração, api e worker com a mesma imagem.
+# Os segredos ficam em deploy/compose/segredos/ (ignorada pelo git); ver README.md desta pasta.
+name: dynaprice
+
+x-backend: &backend
+  image: dynaprice-backend:${DYNAPRICE_VERSAO:-dev}
+  build: ../../backend
+  environment: &ambiente
+    DYNAPRICE_DB_URL_FILE: /run/secrets/db_url_app
+    DYNAPRICE_CHAVES_MESTRAS_FILE: /run/secrets/chaves_mestras
+    DYNAPRICE_CHAVE_ES256_FILE: /run/secrets/chave_es256
+    DYNAPRICE_ORIGEM: ${DYNAPRICE_ORIGEM:-https://localhost:8443}
+    DYNAPRICE_CHAVE_PSEUDONIMO_FILE: /run/secrets/chave_pseudonimo
+  secrets: [db_url_app, chaves_mestras, chave_es256, chave_pseudonimo]
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  pg:
+    image: postgres:18.6
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_superusuario
+    secrets: [pg_superusuario, pg_migrador, pg_app]
+    volumes:
+      - dados_pg:/var/lib/postgresql
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d dynaprice"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrar:
+    <<: *backend
+    command: ["cli", "banco", "migrar"]
+    environment:
+      DYNAPRICE_DB_URL_FILE: /run/secrets/db_url_migrador
+    secrets: [db_url_migrador]
+    depends_on:
+      pg: { condition: service_healthy }
+
+  api:
+    <<: *backend
+    command: ["api"]
+    # default: alcança o banco; interna: recebe só do proxy, que não vê o banco.
+    networks: [default, interna]
+    environment:
+      <<: *ambiente
+      # Só o proxy fala com a API; só o IP dele pode informar o endereço do cliente (M3).
+      DYNAPRICE_PROXY_CONFIAVEL: 172.28.0.10
+    depends_on:
+      migrar: { condition: service_completed_successfully }
+
+  web:
+    image: dynaprice-web:${DYNAPRICE_VERSAO:-dev}
+    build: ../../frontend
+    ports: ["127.0.0.1:8443:8443"]
+    networks:
+      interna:
+        ipv4_address: 172.28.0.10
+    volumes: [./segredos/tls:/etc/nginx/tls:ro]
+    read_only: true
+    tmpfs: [/tmp, /var/cache/nginx]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on: [api]
+
+  worker:
+    <<: *backend
+    command: ["worker"]
+    # O worker não emite token: recebe só o banco e a chave dos conectores.
+    environment:
+      DYNAPRICE_DB_URL_FILE: /run/secrets/db_url_app
+      DYNAPRICE_CHAVES_MESTRAS_FILE: /run/secrets/chaves_mestras
+      DYNAPRICE_CHAVE_PSEUDONIMO_FILE: /run/secrets/chave_pseudonimo
+    secrets: [db_url_app, chaves_mestras, chave_pseudonimo]
+    depends_on:
+      migrar: { condition: service_completed_successfully }
+
+networks:
+  interna:
+    ipam:
+      config: [{ subnet: 172.28.0.0/24 }]
+
+volumes:
+  dados_pg:
+
+secrets:
+  pg_superusuario: { file: ./segredos/pg_superusuario }
+  pg_migrador: { file: ./segredos/pg_migrador }
+  pg_app: { file: ./segredos/pg_app }
+  db_url_app: { file: ./segredos/db_url_app }
+  db_url_migrador: { file: ./segredos/db_url_migrador }
+  chaves_mestras: { file: ./segredos/chaves_mestras }
+  chave_es256: { file: ./segredos/chave_es256 }
+  chave_pseudonimo: { file: ./segredos/chave_pseudonimo }

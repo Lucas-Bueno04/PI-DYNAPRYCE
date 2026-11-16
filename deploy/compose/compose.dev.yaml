@@ -1,0 +1,5 @@
+# Override de desenvolvimento: expõe o banco só no loopback para a API/worker rodarem no host.
+# Uso: docker compose -f compose.yaml -f compose.dev.yaml up -d pg migrar  (o Makefile faz isso)
+services:
+  pg:
+    ports: ["127.0.0.1:${DYNAPRICE_PG_PORTA:-5432}:5432"]
