@@ -1,0 +1,11 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests", "docker:pinDigests"],
+  "timezone": "America/Sao_Paulo",
+  "schedule": ["before 8am on monday"],
+  "labels": ["dependencias"],
+  "packageRules": [
+    { "matchManagers": ["github-actions"], "minimumReleaseAge": "14 days" },
+    { "matchUpdateTypes": ["major"], "dependencyDashboardApproval": true }
+  ]
+}

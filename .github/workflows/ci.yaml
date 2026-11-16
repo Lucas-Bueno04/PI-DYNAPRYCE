@@ -1,0 +1,97 @@
+# F1.38: CI guarda os alvos do perfil. Toda action por SHA completo (docs/versoes.md);
+# trivy e syft rodam por imagem fixada em digest, nunca por action (incidente CVE-2026-33634).
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run lint-imports
+      - run: uv run pytest -q
+      - run: uv export --frozen --no-dev --no-emit-project -o /tmp/requisitos.txt && uv run pip-audit -r /tmp/requisitos.txt --no-deps --disable-pip
+
+  frontend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.22.2
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npm run verificar:api
+      - run: npm audit --omit=dev
+
+  imagens:
+    needs: [backend, frontend]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TRIVY: aquasec/trivy@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+      SYFT: ghcr.io/anchore/syft@sha256:03215d0e98b661d0ecbc8575dbc14d65be1743b5de5df6410aecb7e80f95b060
+    strategy:
+      matrix:
+        alvo: [backend, frontend]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.alvo }}
+          load: true
+          tags: dynaprice-${{ matrix.alvo }}:ci
+      - name: trivy (falha com HIGH ou CRITICAL corrigíveis)
+        run: >
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY"
+          image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed
+          dynaprice-${{ matrix.alvo }}:ci
+      - name: syft (SBOM)
+        run: >
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$SYFT"
+          dynaprice-${{ matrix.alvo }}:ci -o spdx-json > sbom-${{ matrix.alvo }}.spdx.json
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        with:
+          context: ${{ matrix.alvo }}
+          push: true
+          tags: ghcr.io/${{ github.repository }}/${{ matrix.alvo }}:${{ github.sha }}
