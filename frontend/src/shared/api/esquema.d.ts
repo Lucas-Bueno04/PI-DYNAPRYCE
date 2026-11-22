@@ -242,6 +242,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/clientes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Listar Clientes */
+        get: operations["listar_clientes_api_v1_clientes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conectores": {
         parameters: {
             query?: never;
@@ -489,6 +506,23 @@ export interface paths {
         };
         /** Metricas */
         get: operations["metricas_api_v1_metricas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/painel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Painel */
+        get: operations["painel_api_v1_painel_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -897,6 +931,31 @@ export interface components {
             /** Uri */
             uri: string;
         };
+        /** RespostaCliente */
+        RespostaCliente: {
+            /** Cobrado */
+            cobrado: string | null;
+            /** Contrato Id */
+            contrato_id: string;
+            /** Defasagem Pct */
+            defasagem_pct: string | null;
+            /** Empresas */
+            empresas: number;
+            /** Kappa */
+            kappa: string;
+            /** Mes Reajuste */
+            mes_reajuste: number | null;
+            /** Preco Alvo */
+            preco_alvo: string | null;
+            /** Preco Vigente */
+            preco_vigente: string;
+            /** Provisorio */
+            provisorio: boolean;
+            /** Recomendacao */
+            recomendacao: string | null;
+            /** Regime */
+            regime: string | null;
+        };
         /** RespostaConector */
         RespostaConector: {
             /** Credencial Configurada */
@@ -973,6 +1032,13 @@ export interface components {
             desafio?: string | null;
             tokens?: components["schemas"]["RespostaTokens"] | null;
         };
+        /** RespostaFaixa */
+        RespostaFaixa: {
+            /** Contratos */
+            contratos: number;
+            /** Rotulo */
+            rotulo: string;
+        };
         /** RespostaImportacao */
         RespostaImportacao: {
             /** Quarentena */
@@ -986,6 +1052,43 @@ export interface components {
         RespostaLote: {
             /** Lote Id */
             lote_id: string | null;
+        };
+        /** RespostaPainel */
+        RespostaPainel: {
+            /** Alertas */
+            alertas: number;
+            /** Competencia */
+            competencia: string;
+            /** Competencias Com Dados */
+            competencias_com_dados: string[];
+            /** Contratos */
+            contratos: number;
+            /** Divergencias */
+            divergencias: {
+                [key: string]: number;
+            };
+            /** Empresas */
+            empresas: number;
+            /** Faixas */
+            faixas: components["schemas"]["RespostaFaixa"][];
+            /** Maiores Defasagens */
+            maiores_defasagens: components["schemas"]["RespostaCliente"][];
+            /** Por Regime */
+            por_regime: components["schemas"]["RespostaRegime"][];
+            /** Potencial De Reajuste */
+            potencial_de_reajuste: string;
+            /** Provisorios */
+            provisorios: number;
+            /** Receita Alvo */
+            receita_alvo: string;
+            /** Receita Mensal */
+            receita_mensal: string;
+            /** Recomendacoes */
+            recomendacoes: {
+                [key: string]: number;
+            };
+            /** Serie Receita */
+            serie_receita: components["schemas"]["RespostaPonto"][];
         };
         /** RespostaPolitica */
         RespostaPolitica: {
@@ -1003,6 +1106,13 @@ export interface components {
             } | null;
             /** Versao */
             versao: number;
+        };
+        /** RespostaPonto */
+        RespostaPonto: {
+            /** Competencia */
+            competencia: string;
+            /** Valor */
+            valor: string;
         };
         /** RespostaProvisorio */
         RespostaProvisorio: {
@@ -1048,6 +1158,17 @@ export interface components {
         RespostaRedefinicao: {
             /** Token */
             token: string;
+        };
+        /** RespostaRegime */
+        RespostaRegime: {
+            /** Contratos */
+            contratos: number;
+            /** Empresas */
+            empresas: number;
+            /** Receita */
+            receita: string;
+            /** Regime */
+            regime: string;
         };
         /** RespostaReproducao */
         RespostaReproducao: {
@@ -1525,6 +1646,37 @@ export interface operations {
             };
         };
     };
+    listar_clientes_api_v1_clientes_get: {
+        parameters: {
+            query: {
+                competencia: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RespostaCliente"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     listar_conectores_api_v1_conectores_get: {
         parameters: {
             query?: never;
@@ -1956,6 +2108,37 @@ export interface operations {
                             [key: string]: number;
                         };
                     };
+                };
+            };
+        };
+    };
+    painel_api_v1_painel_get: {
+        parameters: {
+            query: {
+                competencia: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RespostaPainel"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

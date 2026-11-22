@@ -1,61 +1,49 @@
-import { AppShell, Group, NavLink, Title } from "@mantine/core";
-import { Link, Outlet, Route, Routes, useLocation } from "react-router";
+import { Route, Routes } from "react-router";
+import { Acompanhamento } from "../features/acompanhamento/Acompanhamento";
 import { Administracao } from "../features/admin/Administracao";
 import { Entrar } from "../features/auth/Entrar";
 import { Guarda } from "../features/auth/Guarda";
 import { Redefinir } from "../features/auth/Redefinir";
+import { Clientes } from "../features/clientes/Clientes";
 import { Cotacao } from "../features/cotacao/Cotacao";
 import { Diagnostico } from "../features/diagnostico/Diagnostico";
 import { Laboratorio } from "../features/laboratorio/Laboratorio";
+import { Painel } from "../features/painel/Painel";
 import { Politicas } from "../features/politicas/Politicas";
 import { Provisorios } from "../features/provisorios/Provisorios";
 import { Recomendacoes } from "../features/recomendacoes/Recomendacoes";
-import { useClaims } from "../shared/api/sessao";
+import { Usuarios } from "../features/usuarios/Usuarios";
+import { useCompetencia } from "./competencia";
+import { Moldura } from "./Moldura";
 
-/** Competência fechada de referência: o mês anterior ao atual. */
-function competenciaAnterior(): string {
-  const hoje = new Date();
-  const anterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-  return `${anterior.getFullYear()}-${String(anterior.getMonth() + 1).padStart(2, "0")}`;
+/** Telas que pedem a competência por propriedade recebem a escolhida no cabeçalho. */
+function ComCompetencia({ tela: Tela }: { tela: (props: { referencia: string }) => React.ReactNode }) {
+  const { competencia } = useCompetencia();
+  return <Tela referencia={competencia} />;
 }
 
-function Moldura() {
-  const claims = useClaims();
-  const { pathname } = useLocation();
-  const itens = [
-    { para: "/", rotulo: "Recomendações" },
-    { para: "/cotacao", rotulo: "Cotação" },
-    { para: "/provisorios", rotulo: "Provisórios" },
-    { para: "/politicas", rotulo: "Políticas" },
-    { para: "/diagnostico", rotulo: "Diagnóstico" },
-    { para: "/laboratorio", rotulo: "Laboratório" },
-    ...(claims?.roles.includes("administrar") ? [{ para: "/administracao", rotulo: "Administração" }] : []),
-  ];
-  return (
-    <AppShell header={{ height: 56 }} navbar={{ width: 220, breakpoint: "sm" }} padding="md">
-      <AppShell.Header><Group h="100%" px="md"><Title order={3}>DynaPrice</Title></Group></AppShell.Header>
-      <AppShell.Navbar p="sm">
-        {itens.map((item) => <NavLink key={item.para} component={Link} to={item.para} label={item.rotulo} active={pathname === item.para} />)}
-      </AppShell.Navbar>
-      <AppShell.Main><Outlet /></AppShell.Main>
-    </AppShell>
-  );
+function AdministracaoDaCompetencia() {
+  const { competencia } = useCompetencia();
+  return <Administracao competencia={competencia} />;
 }
 
 export function App() {
-  const competencia = competenciaAnterior();
   return (
     <Routes>
       <Route path="/entrar" element={<Entrar />} />
       <Route path="/redefinir" element={<Redefinir />} />
       <Route element={<Guarda><Moldura /></Guarda>}>
-        <Route path="/" element={<Recomendacoes />} />
+        <Route path="/" element={<Painel />} />
+        <Route path="/clientes" element={<Clientes />} />
+        <Route path="/recomendacoes" element={<Recomendacoes />} />
         <Route path="/cotacao" element={<Cotacao />} />
-        <Route path="/provisorios" element={<Provisorios referencia={competencia} />} />
         <Route path="/politicas" element={<Politicas />} />
-        <Route path="/diagnostico" element={<Diagnostico referencia={competencia} />} />
-        <Route path="/laboratorio" element={<Laboratorio referencia={competencia} />} />
-        <Route path="/administracao" element={<Guarda papel="administrar"><Administracao competencia={competencia} /></Guarda>} />
+        <Route path="/laboratorio" element={<ComCompetencia tela={Laboratorio} />} />
+        <Route path="/acompanhamento" element={<Acompanhamento />} />
+        <Route path="/provisorios" element={<ComCompetencia tela={Provisorios} />} />
+        <Route path="/diagnostico" element={<ComCompetencia tela={Diagnostico} />} />
+        <Route path="/usuarios" element={<Guarda papel="administrar"><Usuarios /></Guarda>} />
+        <Route path="/administracao" element={<Guarda papel="administrar"><AdministracaoDaCompetencia /></Guarda>} />
       </Route>
     </Routes>
   );
