@@ -1,0 +1,117 @@
+[project]
+name = "dynaprice"
+version = "0.1.0"
+description = "Precificação dinâmica orientada a esforço para serviços profissionais recorrentes (backend)."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "alembic>=1.20.1",
+    "argon2-cffi>=25.1.0",
+    "cryptography>=50.0.2",
+    "fastapi>=0.162.4",
+    "httpx>=0.28.1",
+    "numpy>=2.5.4",
+    "openpyxl>=3.1.5",
+    "pandas>=3.1.1",
+    "psycopg[binary,pool]>=3.3.8",
+    "pydantic>=2.14.3",
+    "pydantic-settings>=2.16.2",
+    "pyjwt[crypto]>=2.15.1",
+    "pyodbc>=5.5.0",
+    "pyotp>=2.10.0",
+    "python-multipart>=0.0.33",
+    "scipy>=1.18.1",
+    "sqlalchemy>=2.1.8",
+    "statsmodels>=0.15.0",
+    "structlog>=26.1.0",
+    "typer>=0.29.0",
+    "tzdata>=2026.6",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+dynaprice = "dynaprice.principal:app"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.4",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "hypothesis>=6.170.15",
+    "import-linter>=2.16",
+    "pandas-stubs>=3.1.0.261029",
+    "scipy-stubs>=1.18.1.1",
+    "testcontainers[postgres]>=4.15.0",
+    "pip-audit>=2.10.1",
+    "types-openpyxl>=3.1.5.20261017",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "N", "RUF", "C90"]
+
+# N818: exceções seguem os nomes do domínio em português (principios.md §5).
+ignore = ["N818"]
+# Notação matemática do artigo nos docstrings (principios.md §1).
+allowed-confusables = ["ℓ", "–", "−", "×", "ρ", "ϱ", "σ", "α", "ν", "𝒞", "𝒬", "𝒰", "𝒟", "ℱ"]
+
+# principios.md §6.2: complexidade ciclomática ≤ 8 por função.
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+# F0.3: a regra de dependência da Clean Architecture (ADR-001) vira teste.
+[tool.importlinter]
+root_package = "dynaprice"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Anéis da Clean Architecture: dependência só para dentro"
+type = "layers"
+layers = [
+    "dynaprice.principal",
+    "dynaprice.adaptadores",
+    "dynaprice.aplicacao",
+    "dynaprice.dominio",
+]
+
+[[tool.importlinter.contracts]]
+name = "Bibliotecas numéricas só em dominio.estimacao (exceção declarada da ADR-001)"
+type = "forbidden"
+source_modules = [
+    "dynaprice.dominio.modelos",
+    "dynaprice.dominio.precificacao",
+    "dynaprice.aplicacao",
+]
+forbidden_modules = ["numpy", "pandas", "sklearn", "statsmodels", "scipy"]
+
+[[tool.importlinter.contracts]]
+name = "Estimação fora da fórmula de preço (E2): preço e casos de uso não importam os estimadores"
+type = "forbidden"
+source_modules = ["dynaprice.dominio.precificacao", "dynaprice.aplicacao"]
+forbidden_modules = ["dynaprice.dominio.estimacao"]
+
+[[tool.importlinter.contracts]]
+name = "Domínio e aplicação não conhecem frameworks nem drivers"
+type = "forbidden"
+source_modules = ["dynaprice.dominio", "dynaprice.aplicacao"]
+forbidden_modules = ["typer", "fastapi", "pydantic", "sqlalchemy", "psycopg", "httpx", "jwt", "pyodbc"]
+
+# statsmodels não publica tipos; fica restrito a dominio/estimacao (ADR-001).
+[[tool.mypy.overrides]]
+module = ["statsmodels", "statsmodels.*", "pyodbc"]
+ignore_missing_imports = true
