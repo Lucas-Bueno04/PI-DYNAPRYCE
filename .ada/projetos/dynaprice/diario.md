@@ -1,0 +1,39 @@
+# Diário: DynaPrice
+
+| Data | Fase | O que aconteceu | Pendente |
+|---|---|---|---|
+| 2026-11-09 | - | Projeto criado na Ada | Desenho |
+| 2026-11-09 | F0 | Execução planejada: 5 fases, 85 passos (F0 23, F1 43, F2 7, F3 7, F4 5); primeiro passo F0.1 | D1-D13, CI e FE-TESTE em aguardando; D1, D2, D3, D4, D10, D11, D13 no portão F0 |
+| 2026-11-09 | F0 | Decisões D1 a D13, CI e FE-TESTE registradas a partir das respostas do humano | valores de π_r, τ, θ/δ e dias de fechamento no portão F0.23 |
+| 2026-11-09 | F0 | Decisões: D12 revisada (κ ∈ [1,0; 1,2] + desconto negociado separado), D5-SEG adiada ao portão F0, D2-REF, princípios de engenharia (docs/engenharia/principios.md) |  |
+| 2026-11-09 | F0 | F0.2 em execução (subagente de código). Adiantado o insumo da F0.6: docs/lab/calibracao_sintetica.md com os alvos da seção 9 do artigo |  |
+| 2026-11-09 | F0 | F0.2 feito: esqueleto backend (Python 3.14.10, uv 29 pacotes, ruff/mypy strict ok, 2 testes CLI), docs/adr exportadas, git local sem remoto |  |
+| 2026-11-09 | F0 | F0.3 feito: import-linter com 3 contratos + 12 testes de arquitetura; descrição da CLI corrigida para serviços profissionais |  |
+| 2026-11-09 | F0 | F0.4 feito: perfil local (alvos backend e backend-arquitetura, mapa com nó local, regras = principios.md, commit manual) |  |
+| 2026-11-09 | F0 | Sessão pausada pelo humano. Feitos F0.1–F0.4 (versões, esqueleto, import-linter, perfil local). Próximo: F0.5 modelos do domínio. Nada commitado ainda (git local sem commit). |  |
+| 2026-11-09 | F0 | F0.4b feito: portões de qualidade (tests/qualidade com AST + grimp, ruff C901). Processo novo registrado (decisão PROC, principios.md §6) |  |
+| 2026-11-09 | F0 | F0.5 feito: modelos do domínio (TDD, 58 testes novos, 87 no total; portões ok). Fachada de pacote tratada à parte no portão de acoplamento |  |
+| 2026-11-09 | F0 | F0.6 feito: gerador sintético calibrado (τ̂ 103,0, P̄ 89,5), CSV byte a byte, cli lab sintetico; decisões G1-CAL e EMP-DEP |  |
+| 2026-11-09 | F0 | F0.7 feito: k_din: Strategy Arredondamento (centavo padrão; comercial por arredondamento.multiplo na política); 127 testes |  |
+| 2026-11-09 | F0 | F0.8 feito: k_teq: EquacoesDeTempo + HorasPadrao (minutos, divisão única) + media_dos_direcionadores; 136 testes |  |
+| 2026-11-09 | F0 | F0.9 feito: k_pol: PoliticaDePreco + PrecoAlvo (decomposição, piso_vinculante, H† Eq. 60); 148 testes |  |
+| 2026-11-09 | F0 | F0.10 feito: k_agr: AgregadorDeContratos (Σ H_pad por empresa com vínculo vigente), pendências SEM_VINCULO/VINCULO_DUPLICADO/SEM_PRINCIPAL, RegraDeSegmento injetável (D1), alerta de misto; 155 testes |  |
+| 2026-11-09 | F0 | F0.11 feito: k_inf: NivelDeInformacao, fator_de_credibilidade (Eq. 56), InferenciaDePreco (Eq. 79), Strategy BaseSemHistorico com PisoDoRegime (ADR-004); 164 testes |  |
+| 2026-11-09 | F0 | F0.12 feito: k_tr RegraDeTransicao (Eq. 72, contenção pós-arredondamento) + ciclos_ate_o_alvo (Eq. 73) + k_gat GatilhoDeRevisao (Eq. 74); 181 testes |  |
+| 2026-11-09 | F0 | F0.13 feito: k_tar: Strategy EstimadorDeTarifa (PrecoRevelado Eq. 65, AncoradaEmCusto Eq. 63–64, ReceitaAlvo exata Prop. 5/Eq. 67), receita Eq. 66, bisseção Eq. 68; 190 testes |  |
+| 2026-11-09 | F0 | F0.14 feito: aceite do núcleo: tests/aceite/test_sim_tabela7.py encadeia k_agr→k_inf→k_teq→k_pol→k_gat→k_tr; 6/7 passos |  |
+| 2026-11-09 | F0 | F0.15 feito: 3 simulações de erro desenhadas (mw9kw9i514upw:8, 9, 10) e testadas em tests/aceite/test_sim_erros_nucleo.py; 194 testes |  |
+| 2026-11-09 | F0 | Sessão pausada pelo humano na F0.16. Feitos nesta sessão: F0.4b (portões de qualidade), F0.5 a F0.15 (modelos, sintético, k_din, k_teq, k_pol, k_agr, k_inf, k_tr/k_gat, k_tar, aceite Tabela 7 e 3 simulações de erro); 194 testes verdes antes da F0.16. Nada commitado. | F0.16: ajustar intervalo de eventos raros em test_huber.py e rodar a bateria |
+| 2026-11-09 | F0 | F0.16 feito: m_teq: EstimadorHuber (statsmodels RLM HuberT c=1,345), amostras por departamento (refatorado após complexidade 12>8), mix por empresa no gerador; 202 testes |  |
+| 2026-11-09 | F0 | F0.17 feito: m_esf: Ridge (Eq. 44, gl Eq. 45, CV 5 partes, 20 λ) sobre ln H̄ x ln(1+x̄) + regime + departamentos atendidos; R² CV 0,87 na semente 42; gerador zera direcionadores de departamento não atendido; contrato E2 no import-linter; 211 testes |  |
+| 2026-11-09 | F0 | F0.18 feito: m_sim: SimuladorDePolitica (R0, ΣP*, R1 Eq. 70, % piso/teto/congelados/gatilho, ciclos) sobre NucleoDePreco (Factory única do núcleo), s²/v² (credibilidade.py), entrada a partir da carteira; 216 testes |  |
+| 2026-11-09 | F0 | F0.19 feito: m_diag: AnalisadorDoLaboratorio (contexto, calibração D2/D3/s²v², 13 seções) via porta AnalisadorDeCarteira (DIP, E2 preservado); LeitorDeCarteiraCsv + teste de contrato da FonteDeCarteira; EscritorDeRelatorioMarkdown; dynaprice lab relatorio; rascunho de política JSON; 238 testes |  |
+| 2026-11-09 | F0 | F0.20 feito: LeitorDePlanilhaDoEscritorio (FonteDeCarteira; lista de permissão de colunas; pseudônimo HMAC-SHA256 na entrada; recusa CPF/salário/linhas de empregado) + Pseudonimizador; layout em docs/lab/layout_planilha.md; cli --fonte planilha com DYNAPRICE_CHAVE_PSEUDONIMO; Huber trata direcionador sem variação; 252 testes |  |
+| 2026-11-09 | F0 | Portão F0 aceito com condição (delegação). F0.16–F0.20 feitos nesta sessão (Huber, Ridge, simulador, relatório, planilha); F0.21/F0.22 adiadas ao fim (dependem do escritório). Início da F1. | F0.21, F0.22 e reabertura de D1–D4/D10/D13 com dados reais |
+| 2026-11-09 | F1 | Sessão pausada pelo humano na F1.1. Nesta sessão: F0.16–F0.20, portão F0 aceito com condição (F0.21/F0.22 adiadas ao fim); 252 testes verdes. Nada commitado. | F1.1: gravar versões em docs/versoes.md; consultar PostgreSQL, Node, syft, trivy, Renovate |
+| 2026-11-11 | F1 | Sessão pausada pelo humano na F1.37 (borda). Nesta sessão: F1.1–F1.36, F1.39–F1.41 feitos; backend 604 testes e frontend 43 verdes; nada commitado. Retomar: F1.37 (nginx+TLS+CSP+HSTS+limite de taxa no compose, IP fixo do proxy fecha M3), depois F1.38 (CI), F1.42 e F1.43. |  |
+| 2026-11-14 | F1 | F1.37 e F1.38 feitos. Borda validada ao vivo (compose: api também na rede do banco, corrigido); CI e Renovate escritos com SHAs completos e digests, regras viraram testes; backend 624 e frontend 43 verdes; nada commitado. Limitações do host: Docker Hub com 429 (usei mirror.gcr.io) e no-new-privileges quebra qualquer contêiner nesta máquina (kernel 7.0), então a verificação ao vivo usou override local sem ele. Retomar: F1.42 (piloto, precisa do escritório) e F1.43 (portão F1). | Rodar o CI no GitHub (remoto a criar); trivy/syft ainda não rodados localmente |
+| 2026-11-14 | F2 | F2.1: sete simulações de cotação e provisório adicionadas ao diagrama (mw9kw9i514upw:24 a 30); D-COT: cotação não cria contrato sozinha. |  |
+| 2026-11-14 | F3 | F2 concluída: F2.1–F2.6 feitos e portão aceito. Cotação (API+tela+reprodução), relatório de provisórios abaixo do esforço, protocolo de ocultação no relatório do laboratório (piso 18,5% vs vizinhos 22–27% no sintético), carga 20 req/s p95 32 ms. Backend 665 testes, frontend 51. Nada commitado. Próximo: F3.1 (replanejar F3). | F1.42 piloto; F0.21/F0.22 com dados reais; CI no GitHub |
+| 2026-11-14 | F4 | F3 concluída no que é construível: F3.1, F3.2 (OIDC+consultor), F3.4 (m_viz não habilitada, D-MVIZ), F3.5 (BCB/IPCA + âncora externa); F3.3 e F3.6 adiados ao fim. Backend 747 testes, frontend 56. Nada commitado. Início da F4 (F4.1: perfil Proxmox, só desenho; implantação exige aprovação do humano). | F1.42, F3.3, F3.6, F0.21/F0.22, CI no GitHub, IdP real, destino externo da âncora |
+| 2026-11-14 | F4 | F4.1: perfil Proxmox em rascunho (docs/procedimentos/perfil-proxmox.md). Proxmox não respondeu à leitura; F4.2–F4.5 dependem de aprovação e acesso. | Acesso ao Proxmox, aprovar RPO/RTO e mudanças de ambiente |

@@ -1,0 +1,340 @@
+{
+  "id": "mw9kw9i514upw",
+  "createdAt": 1794247938077,
+  "updatedAt": 1794250917285,
+  "request": "(pedido feito no terminal)",
+  "title": "Processos, dados e implantação do DynaPrice",
+  "summary": "v5: recalibração com competência fechada, vínculos, conciliação, agregação por contrato e data de reajuste; modelo de dados com Contrato/Empresa/Vínculo, inflação, conectores cifrados, recuperação de acesso e divergências de cobrança.",
+  "views": [
+    {
+      "type": "mermaid",
+      "label": "Sequência: autenticação JWT",
+      "code": "sequenceDiagram\n  participant U as Usuário\n  participant S as SPA React\n  participant API as Backend /api/v1/auth\n  participant DB as PostgreSQL\n  U->>S: e-mail + senha\n  S->>API: POST /auth/entrar\n  API->>DB: usuário, hash Argon2id, tentativas\n  API-->>S: 200 {mfa_requerido, desafio}\n  U->>S: código TOTP\n  S->>API: POST /auth/mfa {desafio, codigo}\n  API->>DB: cria família de refresh (hash) + auditoria\n  API-->>S: {access JWT ES256 15 min} + Set-Cookie refresh (HttpOnly, Secure, SameSite=Strict)\n  S->>S: guarda access só em memória\n  Note over S,API: chamadas: Authorization: Bearer access\n  S->>API: POST /auth/renovar (cookie, antes do exp ou após 401)\n  API->>DB: refresh válido e não usado? marca usado, emite novo (rotação)\n  API-->>S: novo access + novo cookie\n  alt refresh já usado (reuso)\n    API->>DB: revoga a família inteira + alerta de auditoria\n    API-->>S: 401 → tela de login\n  end\n  S->>API: POST /auth/sair\n  API->>DB: revoga a família"
+    },
+    {
+      "type": "mermaid",
+      "label": "Sequência: cotação",
+      "code": "sequenceDiagram\n  participant S as SPA React (cotacao/)\n  participant API as Backend\n  participant DB as PostgreSQL (RLS)\n  S->>API: POST /api/v1/cotacoes {regime (obrigatório), perfil, histórico?} + Bearer\n  API->>API: middleware JWT → Principal(usuario, tid, papeis)\n  API->>DB: BEGIN; set_config('app.tenant_id', tid, true)\n  API->>API: política vigente (memória, por versão): π_regime, τ, s²/v²\n  alt sem histórico\n    API->>API: preço provisório = π_regime\n  else histórico parcial (m meses)\n    API->>API: Z = m/(m + s²/v²); P = κ·[Z·max(π, τ·H_pad,pr) + (1−Z)·π]\n  end\n  API->>DB: INSERT cotacao (entradas, versão de política) + audit\n  API->>DB: COMMIT\n  API-->>S: 201 {preco_provisorio, regime, piso, Z, horas_por_depto?, motivo}"
+    },
+    {
+      "type": "mermaid",
+      "label": "Sequência: recalibração",
+      "code": "sequenceDiagram\n  participant WK as Worker (laço)\n  participant DB as PostgreSQL\n  participant SRC as Conectores\n  participant G as Gestor (SPA)\n  WK->>DB: competência fechou (Relogio + N dias)? INSERT job extrair ON CONFLICT DO NOTHING\n  WK->>DB: SELECT job FOR UPDATE SKIP LOCKED\n  WK->>SRC: extrair (credenciais decifradas só em memória)\n  WK->>DB: raw (nova versão se reextração) → validação/quarentena → empresa×mês\n  WK->>DB: pendências de vínculo? (empresas sem contrato ficam fora e aparecem na UI)\n  WK->>DB: ConciliarCobranca: aprovado × cobrado → alertas\n  WK->>DB: INSERT job recalibrar ON CONFLICT DO NOTHING\n  WK->>DB: BEGIN; tenant; fixa política publicada vN (β, π, τ, θ, δ, parâmetros)\n  WK->>WK: H_pad por empresa → Σ por contrato → nível ℓ → P* (dinheiro: Decimal)\n  WK->>WK: contrato com reajuste na janela? transição (inflação do índice) + gatilho\n  WK->>DB: expira PENDENTE antigas; INSERT recomendacao PENDENTE (data de efeito, entradas usadas)\n  WK->>DB: job = concluido; COMMIT\n  DB-->>G: recomendações e alertas para decisão"
+    },
+    {
+      "type": "mermaid",
+      "label": "Estados da recomendação",
+      "code": "stateDiagram-v2\n  [*] --> Pendente: recalibração (já validada: κ ≤ κ̄, θ, pisos)\n  Pendente --> Aprovada: gestor aprova / ajusta κ\n  Pendente --> Rejeitada: gestor rejeita (motivo)\n  Pendente --> Expirada: recalibração seguinte\n  Aprovada --> Exportada: arquivo gerado / enviado\n  Exportada --> [*]\n  Rejeitada --> [*]\n  Expirada --> [*]"
+    },
+    {
+      "type": "mermaid",
+      "label": "Estados da política",
+      "code": "stateDiagram-v2\n  [*] --> Rascunho: job estimar_politica ou edição no laboratório\n  Rascunho --> Rascunho: ajustes (pisos, θ, origem de τ)\n  Rascunho --> Publicada: gestor aprova (vira imutável)\n  Rascunho --> Descartada\n  Publicada --> Substituida: nova versão publicada\n  Substituida --> [*]\n  Descartada --> [*]"
+    },
+    {
+      "type": "mermaid",
+      "label": "Modelo de dados",
+      "code": "erDiagram\n  TENANT ||--o{ USUARIO_PAPEL : concede\n  USUARIO ||--o{ USUARIO_PAPEL : possui\n  USUARIO ||--o{ SESSAO_FAMILIA : abre\n  SESSAO_FAMILIA ||--o{ REFRESH_TOKEN : rotaciona\n  USUARIO ||--o{ CODIGO_RECUPERACAO : guarda\n  TENANT ||--o{ CONECTOR_CONFIG : configura\n  TENANT ||--o{ CONTRATO : possui\n  TENANT ||--o{ EMPRESA : possui\n  CONTRATO ||--o{ VINCULO : agrupa\n  EMPRESA ||--o{ VINCULO : pertence\n  EMPRESA ||--o{ EMPRESA_MES : historico\n  CONTRATO ||--o{ HONORARIO_MES : cobrado\n  TENANT ||--o{ INDICE_INFLACAO : registra\n  TENANT ||--o{ POLITICA_VERSAO : publica\n  TENANT ||--o{ EXTRACAO_RAW : importa\n  TENANT ||--o{ JOB : agenda\n  POLITICA_VERSAO ||--o{ EQUACAO_TEMPO : contem\n  POLITICA_VERSAO ||--o{ PISO_SEGMENTO : contem\n  POLITICA_VERSAO ||--o| RELATORIO_ESTIMACAO : justificada_por\n  CONTRATO ||--o{ PRECO_ALVO : recebe\n  PRECO_ALVO }o--|| POLITICA_VERSAO : calculado_por\n  PRECO_ALVO ||--o| RECOMENDACAO : origina\n  RECOMENDACAO ||--o{ DIVERGENCIA_COBRANCA : conciliada_em\n  TENANT ||--o{ COTACAO : registra\n  TENANT ||--o{ AUDIT_EVENTO : registra\n  CONTRATO {\n    uuid tenant_id\n    uuid id\n    string codigo\n    string segmento\n    numeric preco_vigente\n    int mes_reajuste\n    numeric kappa\n    string kappa_justificativa\n    bool provisorio\n  }\n  EMPRESA {\n    uuid tenant_id\n    uuid id\n    string documento_cifrado\n    string codigo_escrituracao\n    jsonb perfil\n  }\n  VINCULO {\n    uuid contrato_id\n    uuid empresa_id\n    bool principal\n    date desde\n    date ate\n  }\n  EMPRESA_MES {\n    uuid empresa_id\n    date competencia\n    int versao_extracao\n    jsonb direcionadores\n    numeric horas_registradas\n  }\n  HONORARIO_MES {\n    uuid contrato_id\n    date competencia\n    numeric valor_cobrado\n  }\n  CONECTOR_CONFIG {\n    uuid tenant_id\n    string tipo\n    bytea credencial_cifrada\n    int dias_fechamento\n  }\n  INDICE_INFLACAO {\n    date competencia\n    string indice\n    numeric variacao\n    uuid registrado_por\n  }\n  POLITICA_VERSAO {\n    uuid tenant_id\n    int versao\n    string estado\n    numeric tarifa\n    string origem_tarifa\n    jsonb parametros\n    uuid aprovado_por\n  }\n  PRECO_ALVO {\n    uuid contrato_id\n    date competencia\n    int nivel_informacao\n    numeric h_pad\n    jsonb entradas\n    numeric preco_alvo\n  }\n  RECOMENDACAO {\n    string estado\n    numeric preco_vigente\n    numeric preco_proposto\n    date data_efeito\n    jsonb trajetoria\n    uuid decidido_por\n  }\n  DIVERGENCIA_COBRANCA {\n    date competencia\n    numeric aprovado\n    numeric cobrado\n    string situacao\n  }\n  USUARIO {\n    uuid id\n    string email\n    string senha_argon2id\n    bytea totp_cifrado\n    bool mfa_ativo\n  }\n  REFRESH_TOKEN {\n    uuid familia_id\n    bytea hash_sha256\n    timestamp expira_em\n    timestamp usado_em\n  }\n  AUDIT_EVENTO {\n    bigint seq\n    uuid usuario_id\n    string request_id\n    jsonb conteudo\n    bytea hash\n  }"
+    },
+    {
+      "type": "graph",
+      "label": "Implantação (agnóstica)",
+      "direction": "TB",
+      "layers": [
+        "Cliente",
+        "Entrada",
+        "Servidor",
+        "Dados",
+        "Fora do host"
+      ],
+      "nodes": [
+        {
+          "id": "dp_user",
+          "label": "Navegador (SPA React)",
+          "kind": "client",
+          "info": "",
+          "group": "Cliente",
+          "layer": 0
+        },
+        {
+          "id": "dp_proxy",
+          "label": "Proxy TLS + estáticos da SPA",
+          "kind": "gateway",
+          "info": "Serve frontend/dist em / e encaminha /api. Em Proxmox (F4): borda da intranet.",
+          "group": "Entrada",
+          "layer": 1
+        },
+        {
+          "id": "dp_web",
+          "label": "contêiner backend api",
+          "kind": "service",
+          "info": "imagem dynaprice-backend:<versão> cmd=api. Chave ES256 por segredo.",
+          "group": "Servidor",
+          "layer": 2
+        },
+        {
+          "id": "dp_worker",
+          "label": "contêiner backend worker",
+          "kind": "service",
+          "info": "mesma imagem, cmd=worker.",
+          "group": "Servidor",
+          "layer": 2
+        },
+        {
+          "id": "dp_pg",
+          "label": "PostgreSQL 16+",
+          "kind": "data",
+          "info": "Único estado.",
+          "group": "Dados",
+          "layer": 3
+        },
+        {
+          "id": "dp_bkp",
+          "label": "Backup externo",
+          "kind": "data",
+          "info": "Dump + WAL; restauração ensaiada.",
+          "group": "Fora do host",
+          "layer": 4
+        },
+        {
+          "id": "dp_src",
+          "label": "Sistemas de origem",
+          "kind": "external",
+          "info": "",
+          "group": "Fora do host",
+          "layer": 4
+        }
+      ],
+      "edges": [
+        {
+          "from": "dp_user",
+          "to": "dp_proxy",
+          "label": "HTTPS",
+          "style": "solid",
+          "id": "emw9mo49xgt8nk"
+        },
+        {
+          "from": "dp_proxy",
+          "to": "dp_web",
+          "label": "HTTP /api",
+          "style": "solid",
+          "id": "emw9mo49xmaoe1"
+        },
+        {
+          "from": "dp_web",
+          "to": "dp_pg",
+          "label": "SQL/TLS",
+          "style": "solid",
+          "id": "emw9mo49xsvszc"
+        },
+        {
+          "from": "dp_worker",
+          "to": "dp_pg",
+          "label": "SQL/TLS",
+          "style": "solid",
+          "id": "emw9mo49x55kd5"
+        },
+        {
+          "from": "dp_worker",
+          "to": "dp_src",
+          "label": "RO",
+          "style": "solid",
+          "id": "emw9mo49x2w4d7"
+        },
+        {
+          "from": "dp_pg",
+          "to": "dp_bkp",
+          "label": "dump + WAL",
+          "style": "dashed",
+          "id": "emw9mo49xb0mo9"
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Preço-alvo e transição (Tabela 7)",
+      "graph": {
+        "direction": "LR",
+        "nodes": [
+          {
+            "id": "s_cli",
+            "label": "Cliente LP",
+            "kind": "actor",
+            "info": "Lucro Presumido; 30 NF entrada, 40 lanç. manuais, 2 empregados.",
+            "layer": 0
+          },
+          {
+            "id": "s_teq",
+            "label": "equacoes_tempo.horas_padrao",
+            "kind": "service",
+            "info": "β da política v4 (Tabela 4).",
+            "layer": 2
+          },
+          {
+            "id": "s_pol",
+            "label": "politica.preco_alvo",
+            "kind": "decision",
+            "info": "π_LP = 235, τ̂ = 103,5, κ = 1.",
+            "layer": 2
+          },
+          {
+            "id": "s_tr",
+            "label": "transicao + gatilho",
+            "kind": "service",
+            "info": "θ = 15%, δ = 15%.",
+            "layer": 2
+          },
+          {
+            "id": "s_rec",
+            "label": "Recomendação",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "s_ges",
+            "label": "Gestor",
+            "kind": "actor",
+            "info": "",
+            "layer": 0
+          }
+        ],
+        "edges": [
+          {
+            "from": "s_cli",
+            "to": "s_teq",
+            "label": "direcionadores",
+            "style": "solid",
+            "id": "emw9mo49xo2rpk"
+          },
+          {
+            "from": "s_teq",
+            "to": "s_pol",
+            "label": "H_pad",
+            "style": "solid",
+            "id": "emw9mo49xtmac2"
+          },
+          {
+            "from": "s_pol",
+            "to": "s_tr",
+            "label": "P*",
+            "style": "solid",
+            "id": "emw9mo49x3ca93"
+          },
+          {
+            "from": "s_tr",
+            "to": "s_rec",
+            "label": "trajetória",
+            "style": "solid",
+            "id": "emw9mo49x4tpda"
+          },
+          {
+            "from": "s_rec",
+            "to": "s_ges",
+            "label": "PENDENTE",
+            "style": "solid",
+            "id": "emw9mo49xfmj3c"
+          }
+        ],
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ]
+      },
+      "steps": [
+        {
+          "title": "Direcionadores médios de 12 meses",
+          "detail": "Cliente do Lucro Presumido com 30 notas de entrada, 40 lançamentos manuais e 2 empregados por mês; nível de informação 2.",
+          "active": [
+            "s_cli",
+            "s_teq"
+          ],
+          "state": {
+            "nivel_informacao": 2,
+            "segmento": "LP"
+          }
+        },
+        {
+          "title": "Horas-padrão por departamento",
+          "detail": "Fiscal 0,91 + 30×3,75/60 = 2,785; Contábil 0,79 + 40×2,54/60 = 2,483; Folha 0,05 + 2×18,5/60 = 0,667.",
+          "active": [
+            "s_teq"
+          ],
+          "state": {
+            "h_pad_fiscal": 2.785,
+            "h_pad_contabil": 2.483,
+            "h_pad_folha": 0.667,
+            "h_pad_total": 5.935
+          }
+        },
+        {
+          "title": "Aplicação da política",
+          "detail": "τ̂·H_pad = 103,5 × 5,935 = 614,27 > piso 235 (ponto de quebra 2,27 h); κ = 1.",
+          "active": [
+            "s_teq",
+            "s_pol"
+          ],
+          "state": {
+            "preco_alvo": 614.27,
+            "piso_vinculante": false
+          }
+        },
+        {
+          "title": "Distância ao alvo",
+          "detail": "Preço atual pela regra implícita 213 + 32×7,0 ≈ 437. G = 1,41; t* = ⌈ln 1,41 / ln 1,15⌉ = 3 ciclos.",
+          "active": [
+            "s_pol",
+            "s_tr"
+          ],
+          "state": {
+            "preco_vigente": 437,
+            "G": 1.41,
+            "ciclos_ate_alvo": 3
+          }
+        },
+        {
+          "title": "Gatilho de revisão",
+          "detail": "|ln(437/614,27)| = 0,34 > ln 1,15 = 0,14 → recomendação gerada.",
+          "active": [
+            "s_tr",
+            "s_rec"
+          ],
+          "state": {
+            "recomendacao": "PENDENTE"
+          }
+        },
+        {
+          "title": "Trajetória proposta",
+          "detail": "Ciclos sem inflação, com Decimal ROUND_HALF_UP: 437 → 502,55 → 577,93 → 614,27 (nunca ultrapassa o alvo). O artigo mostra 503 e 578, que são valores arredondados.",
+          "active": [
+            "s_tr",
+            "s_rec"
+          ],
+          "state": {
+            "trajetoria": [
+              437,
+              502.55,
+              577.93,
+              614.27
+            ]
+          }
+        },
+        {
+          "title": "Decisão humana",
+          "detail": "Gestor vê decomposição (piso, horas por depto, τ, κ) e aprova; evento de auditoria encadeado; arquivo de exportação gerado.",
+          "active": [
+            "s_rec",
+            "s_ges"
+          ],
+          "state": {
+            "recomendacao": "APROVADA",
+            "preco_ciclo_1": 502.55
+          }
+        }
+      ]
+    }
+  ]
+}

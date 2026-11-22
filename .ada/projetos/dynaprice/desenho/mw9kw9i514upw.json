@@ -1,0 +1,2305 @@
+{
+  "id": "mw9kw9i514upw",
+  "createdAt": 1794247938077,
+  "updatedAt": 1794363993057,
+  "request": "(pedido feito no terminal)",
+  "title": "Processos, dados e implantação do DynaPrice",
+  "summary": "Fechamento das lacunas de F1: estados de job, contrato, vínculo e divergência; ER completo; 9 simulações de erro; parâmetros.",
+  "views": [
+    {
+      "type": "mermaid",
+      "label": "Sequência: autenticação JWT",
+      "code": "sequenceDiagram\n  participant U as Usuário\n  participant S as SPA React\n  participant API as Backend /api/v1/auth\n  participant DB as PostgreSQL\n  U->>S: e-mail + senha\n  S->>API: POST /auth/entrar\n  API->>DB: usuário, hash Argon2id, tentativas\n  API-->>S: 200 {mfa_requerido, desafio}\n  U->>S: código TOTP\n  S->>API: POST /auth/mfa {desafio, codigo}\n  API->>DB: cria família de refresh (hash) + auditoria\n  API-->>S: {access JWT ES256 15 min} + Set-Cookie refresh (HttpOnly, Secure, SameSite=Strict)\n  S->>S: guarda access só em memória\n  Note over S,API: chamadas: Authorization: Bearer access\n  S->>API: POST /auth/renovar (cookie, antes do exp ou após 401)\n  API->>DB: refresh válido e não usado? marca usado, emite novo (rotação)\n  API-->>S: novo access + novo cookie\n  alt refresh já usado (reuso)\n    API->>DB: revoga a família inteira + alerta de auditoria\n    API-->>S: 401 → tela de login\n  end\n  S->>API: POST /auth/sair\n  API->>DB: revoga a família"
+    },
+    {
+      "type": "mermaid",
+      "label": "Sequência: cotação",
+      "code": "sequenceDiagram\n  participant S as SPA React (cotacao/)\n  participant API as Backend\n  participant DB as PostgreSQL (RLS)\n  S->>API: POST /api/v1/cotacoes {regime (obrigatório), perfil, histórico?} + Bearer\n  API->>API: middleware JWT → Principal(usuario, tid, papeis)\n  API->>DB: BEGIN; set_config('app.tenant_id', tid, true)\n  API->>API: política vigente (memória, por versão): π_regime, τ, s²/v²\n  alt sem histórico\n    API->>API: preço provisório = π_regime\n  else histórico parcial (m meses)\n    API->>API: Z = m/(m + s²/v²); P = κ·[Z·max(π, τ·H_pad,pr) + (1−Z)·π]\n  end\n  API->>DB: INSERT cotacao (entradas, versão de política) + audit\n  API->>DB: COMMIT\n  API-->>S: 201 {preco_provisorio, regime, piso, Z, horas_por_depto?, motivo}"
+    },
+    {
+      "type": "mermaid",
+      "label": "Sequência: recalibração",
+      "code": "sequenceDiagram\n  participant WK as Worker (laço)\n  participant DB as PostgreSQL\n  participant SRC as Conectores\n  participant G as Gestor (SPA)\n  WK->>DB: competência fechou (Relogio + N dias)? INSERT job extrair ON CONFLICT DO NOTHING\n  WK->>DB: SELECT job FOR UPDATE SKIP LOCKED\n  WK->>SRC: extrair (credenciais decifradas só em memória)\n  WK->>DB: raw (nova versão se reextração) → validação/quarentena → empresa×mês\n  WK->>DB: pendências de vínculo? (empresas sem contrato ficam fora e aparecem na UI)\n  WK->>DB: ConciliarCobranca: aprovado × cobrado → alertas\n  WK->>DB: INSERT job recalibrar ON CONFLICT DO NOTHING\n  WK->>DB: BEGIN; tenant; fixa política publicada vN (β, π, τ, θ, δ, parâmetros)\n  WK->>WK: H_pad por empresa → Σ por contrato → nível ℓ → P* (dinheiro: Decimal)\n  WK->>WK: contrato com reajuste na janela? transição (inflação do índice) + gatilho\n  WK->>DB: expira PENDENTE antigas; INSERT recomendacao PENDENTE (data de efeito, entradas usadas)\n  WK->>DB: job = concluido; COMMIT\n  DB-->>G: recomendações e alertas para decisão"
+    },
+    {
+      "type": "mermaid",
+      "label": "Estados da recomendação",
+      "code": "stateDiagram-v2\n  [*] --> Pendente: recalibração (já validada: κ ≤ κ̄, θ, pisos)\n  Pendente --> Aprovada: aprovar ou ajustar κ (versão otimista, TOTP)\n  Pendente --> Rejeitada: rejeitar (motivo)\n  Pendente --> Expirada: recalibração seguinte\n  Aprovada --> Exportada: lote gerado (job exportar)\n  Aprovada --> FalhaExportacao: tentativas do job esgotadas\n  FalhaExportacao --> Aprovada: nova tentativa manual (mesmo lote)\n  note right of Aprovada\n    Não expira. Na recalibração seguinte o contrato\n    é pulado e a pendência é alertada ao gestor.\n  end note\n  Exportada --> [*]\n  Rejeitada --> [*]\n  Expirada --> [*]"
+    },
+    {
+      "type": "mermaid",
+      "label": "Estados da política",
+      "code": "stateDiagram-v2\n  [*] --> Rascunho: job estimar_politica ou edição no laboratório\n  Rascunho --> Rascunho: ajustes (pisos, θ, origem de τ)\n  Rascunho --> Publicada: gestor aprova (vira imutável)\n  Rascunho --> Descartada\n  Publicada --> Substituida: nova versão publicada\n  Substituida --> [*]\n  Descartada --> [*]"
+    },
+    {
+      "type": "mermaid",
+      "label": "Modelo de dados",
+      "code": "erDiagram\n  TENANT ||--o{ USUARIO_PAPEL : concede\n  USUARIO ||--o{ USUARIO_PAPEL : possui\n  USUARIO ||--o{ SESSAO_FAMILIA : abre\n  SESSAO_FAMILIA ||--o{ REFRESH_TOKEN : rotaciona\n  USUARIO ||--o{ CODIGO_RECUPERACAO : guarda\n  TENANT ||--o{ CONECTOR_CONFIG : configura\n  TENANT ||--o{ CONTRATO : possui\n  TENANT ||--o{ EMPRESA : possui\n  CONTRATO ||--o{ VINCULO : agrupa\n  EMPRESA ||--o{ VINCULO : pertence\n  EMPRESA ||--o{ EMPRESA_MES : historico\n  CONTRATO ||--o{ HONORARIO_MES : cobrado\n  TENANT ||--o{ POLITICA_VERSAO : publica\n  TENANT ||--o{ EXTRACAO_RAW : importa\n  TENANT ||--o{ JOB : agenda\n  POLITICA_VERSAO ||--o{ EQUACAO_TEMPO : contem\n  POLITICA_VERSAO ||--o{ PISO_SEGMENTO : contem\n  POLITICA_VERSAO ||--o| RELATORIO_ESTIMACAO : justificada_por\n  CONTRATO ||--o{ PRECO_ALVO : recebe\n  PRECO_ALVO }o--|| POLITICA_VERSAO : calculado_por\n  PRECO_ALVO ||--o| RECOMENDACAO : origina\n  RECOMENDACAO ||--o{ DIVERGENCIA_COBRANCA : conciliada_em\n  TENANT ||--o{ LOTE_EXPORTACAO : gera\n  LOTE_EXPORTACAO ||--o{ RECOMENDACAO : agrupa\n  TENANT ||--o{ COTACAO : registra\n  TENANT ||--o{ AUDIT_EVENTO : registra\n  CONTRATO {\n    uuid tenant_id\n    uuid id\n    string codigo\n    string segmento\n    numeric preco_vigente\n    int mes_reajuste\n    numeric kappa\n    string kappa_justificativa\n    string estado\n    int versao\n  }\n  EMPRESA {\n    uuid tenant_id\n    uuid id\n    string documento_cifrado\n    string codigo_escrituracao\n    jsonb perfil\n  }\n  VINCULO {\n    uuid contrato_id\n    uuid empresa_id\n    bool principal\n    date desde\n    date ate\n  }\n  EMPRESA_MES {\n    uuid empresa_id\n    date competencia\n    int versao_extracao\n    jsonb direcionadores\n    numeric horas_registradas\n  }\n  HONORARIO_MES {\n    uuid contrato_id\n    date competencia\n    numeric valor_cobrado\n  }\n  CONECTOR_CONFIG {\n    uuid tenant_id\n    string tipo\n    bytea credencial_cifrada\n    int dias_fechamento\n  }\n  INDICE_INFLACAO {\n    date competencia\n    string indice\n    numeric variacao\n    uuid registrado_por\n  }\n  POLITICA_VERSAO {\n    uuid tenant_id\n    int versao\n    string estado\n    numeric tarifa\n    string origem_tarifa\n    jsonb parametros\n    uuid aprovado_por\n  }\n  PRECO_ALVO {\n    uuid contrato_id\n    date competencia\n    int nivel_informacao\n    numeric h_pad\n    jsonb entradas\n    numeric preco_alvo\n  }\n  RECOMENDACAO {\n    uuid tenant_id\n    uuid contrato_id\n    int politica_versao\n    date competencia\n    int versao\n    uuid lote_id\n    string estado\n    numeric preco_vigente\n    numeric preco_proposto\n    date data_efeito\n    jsonb trajetoria\n    uuid decidido_por\n  }\n  DIVERGENCIA_COBRANCA {\n    uuid tenant_id\n    uuid contrato_id\n    date competencia\n    numeric aprovado\n    numeric cobrado\n    string situacao\n    string justificativa\n  }\n  USUARIO {\n    uuid id\n    string email\n    string senha_argon2id\n    bytea totp_cifrado\n    bool mfa_ativo\n  }\n  REFRESH_TOKEN {\n    uuid familia_id\n    bytea hash_sha256\n    timestamp expira_em\n    timestamp usado_em\n  }\n  AUDIT_EVENTO {\n    uuid tenant_id\n    bigint seq\n    bytea hash_anterior\n    uuid usuario_id\n    string request_id\n    jsonb conteudo\n    bytea hash\n  }\n  TENANT {\n    uuid id\n    string nome\n    string estado\n    timestamp criado_em\n  }\n  USUARIO_PAPEL {\n    uuid usuario_id\n    uuid tenant_id\n    string papel\n  }\n  JOB {\n    uuid id\n    uuid tenant_id\n    string tipo\n    string chave_idempotencia\n    jsonb parametros\n    string estado\n    int tentativas\n    int max_tentativas\n    timestamp proxima_tentativa_em\n    timestamp lease_ate\n    timestamp heartbeat_em\n    string lease_dono\n    string erro\n    timestamp concluido_em\n  }\n  EXTRACAO_RAW {\n    uuid id\n    uuid tenant_id\n    string fonte\n    date competencia\n    int versao\n    string origem\n    string hash_conteudo\n    jsonb conteudo\n    bool substituida\n    timestamp extraido_em\n  }\n  LOTE_EXPORTACAO {\n    uuid id\n    uuid tenant_id\n    string hash_recomendacoes\n    string arquivo_sha256\n    timestamp gerado_em\n  }\n"
+    },
+    {
+      "type": "graph",
+      "label": "Implantação (agnóstica)",
+      "direction": "TB",
+      "layers": [
+        "Cliente",
+        "Entrada",
+        "Servidor",
+        "Dados",
+        "Fora do host"
+      ],
+      "nodes": [
+        {
+          "id": "dp_user",
+          "label": "Navegador (SPA React)",
+          "kind": "client",
+          "info": "",
+          "group": "Cliente",
+          "layer": 0
+        },
+        {
+          "id": "dp_proxy",
+          "label": "Proxy TLS + estáticos da SPA",
+          "kind": "gateway",
+          "info": "Serve frontend/dist em / e encaminha /api. Em Proxmox (F4): borda da intranet.",
+          "group": "Entrada",
+          "layer": 1
+        },
+        {
+          "id": "dp_web",
+          "label": "contêiner backend api",
+          "kind": "service",
+          "info": "imagem dynaprice-backend:<versão> cmd=api. Chave ES256 por segredo.",
+          "group": "Servidor",
+          "layer": 2
+        },
+        {
+          "id": "dp_worker",
+          "label": "contêiner backend worker",
+          "kind": "service",
+          "info": "mesma imagem, cmd=worker.",
+          "group": "Servidor",
+          "layer": 2
+        },
+        {
+          "id": "dp_pg",
+          "label": "PostgreSQL 16+",
+          "kind": "data",
+          "info": "Único estado.",
+          "group": "Dados",
+          "layer": 3
+        },
+        {
+          "id": "dp_bkp",
+          "label": "Backup externo",
+          "kind": "data",
+          "info": "Dump + WAL; restauração ensaiada.",
+          "group": "Fora do host",
+          "layer": 4
+        },
+        {
+          "id": "dp_src",
+          "label": "Sistemas de origem",
+          "kind": "external",
+          "info": "",
+          "group": "Fora do host",
+          "layer": 4
+        }
+      ],
+      "edges": [
+        {
+          "from": "dp_user",
+          "to": "dp_proxy",
+          "label": "HTTPS",
+          "style": "solid",
+          "id": "emw9mo49xgt8nk"
+        },
+        {
+          "from": "dp_proxy",
+          "to": "dp_web",
+          "label": "HTTP /api",
+          "style": "solid",
+          "id": "emw9mo49xmaoe1"
+        },
+        {
+          "from": "dp_web",
+          "to": "dp_pg",
+          "label": "SQL/TLS",
+          "style": "solid",
+          "id": "emw9mo49xsvszc"
+        },
+        {
+          "from": "dp_worker",
+          "to": "dp_pg",
+          "label": "SQL/TLS",
+          "style": "solid",
+          "id": "emw9mo49x55kd5"
+        },
+        {
+          "from": "dp_worker",
+          "to": "dp_src",
+          "label": "RO",
+          "style": "solid",
+          "id": "emw9mo49x2w4d7"
+        },
+        {
+          "from": "dp_pg",
+          "to": "dp_bkp",
+          "label": "dump + WAL",
+          "style": "dashed",
+          "id": "emw9mo49xb0mo9"
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Preço-alvo e transição (Tabela 7)",
+      "graph": {
+        "direction": "LR",
+        "nodes": [
+          {
+            "id": "s_cli",
+            "label": "Cliente LP",
+            "kind": "actor",
+            "info": "Lucro Presumido; 30 NF entrada, 40 lanç. manuais, 2 empregados.",
+            "layer": 0
+          },
+          {
+            "id": "s_teq",
+            "label": "equacoes_tempo.horas_padrao",
+            "kind": "service",
+            "info": "β da política v4 (Tabela 4).",
+            "layer": 2
+          },
+          {
+            "id": "s_pol",
+            "label": "politica.preco_alvo",
+            "kind": "decision",
+            "info": "π_LP = 235, τ̂ = 103,5, κ = 1.",
+            "layer": 2
+          },
+          {
+            "id": "s_tr",
+            "label": "transicao + gatilho",
+            "kind": "service",
+            "info": "θ = 15%, δ = 15%.",
+            "layer": 2
+          },
+          {
+            "id": "s_rec",
+            "label": "Recomendação",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "s_ges",
+            "label": "Gestor",
+            "kind": "actor",
+            "info": "",
+            "layer": 0
+          }
+        ],
+        "edges": [
+          {
+            "from": "s_cli",
+            "to": "s_teq",
+            "label": "direcionadores",
+            "style": "solid",
+            "id": "emw9mo49xo2rpk"
+          },
+          {
+            "from": "s_teq",
+            "to": "s_pol",
+            "label": "H_pad",
+            "style": "solid",
+            "id": "emw9mo49xtmac2"
+          },
+          {
+            "from": "s_pol",
+            "to": "s_tr",
+            "label": "P*",
+            "style": "solid",
+            "id": "emw9mo49x3ca93"
+          },
+          {
+            "from": "s_tr",
+            "to": "s_rec",
+            "label": "trajetória",
+            "style": "solid",
+            "id": "emw9mo49x4tpda"
+          },
+          {
+            "from": "s_rec",
+            "to": "s_ges",
+            "label": "PENDENTE",
+            "style": "solid",
+            "id": "emw9mo49xfmj3c"
+          }
+        ],
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ]
+      },
+      "steps": [
+        {
+          "title": "Direcionadores médios de 12 meses",
+          "detail": "Cliente do Lucro Presumido com 30 notas de entrada, 40 lançamentos manuais e 2 empregados por mês; nível de informação 2.",
+          "active": [
+            "s_cli",
+            "s_teq"
+          ],
+          "state": {
+            "nivel_informacao": 2,
+            "segmento": "LP"
+          }
+        },
+        {
+          "title": "Horas-padrão por departamento",
+          "detail": "Fiscal 0,91 + 30×3,75/60 = 2,785; Contábil 0,79 + 40×2,54/60 = 2,483; Folha 0,05 + 2×18,5/60 = 0,667.",
+          "active": [
+            "s_teq"
+          ],
+          "state": {
+            "h_pad_fiscal": 2.785,
+            "h_pad_contabil": 2.483,
+            "h_pad_folha": 0.667,
+            "h_pad_total": 5.935
+          }
+        },
+        {
+          "title": "Aplicação da política",
+          "detail": "τ̂·H_pad = 103,5 × 5,935 = 614,27 > piso 235 (ponto de quebra 2,27 h); κ = 1.",
+          "active": [
+            "s_teq",
+            "s_pol"
+          ],
+          "state": {
+            "preco_alvo": 614.27,
+            "piso_vinculante": false
+          }
+        },
+        {
+          "title": "Distância ao alvo",
+          "detail": "Preço atual pela regra implícita 213 + 32×7,0 ≈ 437. G = 1,41; t* = ⌈ln 1,41 / ln 1,15⌉ = 3 ciclos.",
+          "active": [
+            "s_pol",
+            "s_tr"
+          ],
+          "state": {
+            "preco_vigente": 437,
+            "G": 1.41,
+            "ciclos_ate_alvo": 3
+          }
+        },
+        {
+          "title": "Gatilho de revisão",
+          "detail": "|ln(437/614,27)| = 0,34 > ln 1,15 = 0,14 → recomendação gerada.",
+          "active": [
+            "s_tr",
+            "s_rec"
+          ],
+          "state": {
+            "recomendacao": "PENDENTE"
+          }
+        },
+        {
+          "title": "Trajetória proposta",
+          "detail": "Ciclos sem inflação, com Decimal ROUND_HALF_UP: 437 → 502,55 → 577,93 → 614,27 (nunca ultrapassa o alvo). O artigo mostra 503 e 578, que são valores arredondados.",
+          "active": [
+            "s_tr",
+            "s_rec"
+          ],
+          "state": {
+            "trajetoria": [
+              437,
+              502.55,
+              577.93,
+              614.27
+            ]
+          }
+        },
+        {
+          "title": "Decisão humana",
+          "detail": "Gestor vê decomposição (piso, horas por depto, τ, κ) e aprova; evento de auditoria encadeado; arquivo de exportação gerado.",
+          "active": [
+            "s_rec",
+            "s_ges"
+          ],
+          "state": {
+            "recomendacao": "APROVADA",
+            "preco_ciclo_1": 502.55
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Piso vinculante e alvo abaixo do vigente",
+      "graph": {
+        "direction": "LR",
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ],
+        "nodes": [
+          {
+            "id": "pv_cli",
+            "label": "Cliente SN pequeno",
+            "kind": "actor",
+            "info": "Simples Nacional sem direcionadores relevantes; paga 250.",
+            "layer": 0
+          },
+          {
+            "id": "pv_teq",
+            "label": "equacoes_tempo.horas_padrao",
+            "kind": "service",
+            "info": "Só os β0: 0,91 + 0,79 + 0,05 = 1,75 h.",
+            "layer": 2
+          },
+          {
+            "id": "pv_pol",
+            "label": "politica.preco_alvo",
+            "kind": "decision",
+            "info": "π_SN = 185, τ = 103,5, κ = 1.",
+            "layer": 2
+          },
+          {
+            "id": "pv_gat",
+            "label": "gatilho",
+            "kind": "decision",
+            "info": "δ = 15%.",
+            "layer": 2
+          },
+          {
+            "id": "pv_tr",
+            "label": "transicao",
+            "kind": "service",
+            "info": "θ = 15%, inflação 4%.",
+            "layer": 2
+          }
+        ],
+        "edges": [
+          {
+            "from": "pv_cli",
+            "to": "pv_teq",
+            "label": "direcionadores",
+            "style": "solid",
+            "id": "epv1"
+          },
+          {
+            "from": "pv_teq",
+            "to": "pv_pol",
+            "label": "H_pad",
+            "style": "solid",
+            "id": "epv2"
+          },
+          {
+            "from": "pv_pol",
+            "to": "pv_gat",
+            "label": "P*",
+            "style": "solid",
+            "id": "epv3"
+          },
+          {
+            "from": "pv_gat",
+            "to": "pv_tr",
+            "label": "desvio acima",
+            "style": "solid",
+            "id": "epv4"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "title": "Horas-padrão só com os tempos fixos",
+          "detail": "Sem notas, lançamentos nem empregados: H_pad = Σβ0 = 1,75 h (seção 6.6).",
+          "active": [
+            "pv_cli",
+            "pv_teq"
+          ],
+          "state": {
+            "h_pad_total": 1.75
+          }
+        },
+        {
+          "title": "Piso vinculante",
+          "detail": "τ·H_pad = 103,5 × 1,75 = 181,13 < π_SN = 185 → o alvo é o piso.",
+          "active": [
+            "pv_teq",
+            "pv_pol"
+          ],
+          "state": {
+            "preco_alvo": 185,
+            "piso_vinculante": true
+          }
+        },
+        {
+          "title": "Gatilho acima do alvo",
+          "detail": "|ln(250/185)| = 0,30 > ln 1,15 → revisão recomendada, direção acima.",
+          "active": [
+            "pv_pol",
+            "pv_gat"
+          ],
+          "state": {
+            "gatilho": "dispara",
+            "direcao": "acima"
+          }
+        },
+        {
+          "title": "Congelamento nominal",
+          "detail": "Inflação 4%: B = 260 > P* = 185 → P = max(185, 250) = 250; o nominal não cai (Algoritmo 3, Prop. 8a).",
+          "active": [
+            "pv_gat",
+            "pv_tr"
+          ],
+          "state": {
+            "proximo_preco": 250,
+            "motivo": "congelado"
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Desvio dentro da zona morta",
+      "graph": {
+        "direction": "LR",
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ],
+        "nodes": [
+          {
+            "id": "zm_pol",
+            "label": "politica.preco_alvo",
+            "kind": "decision",
+            "info": "Cliente da Tabela 7: P* = 614,27.",
+            "layer": 2
+          },
+          {
+            "id": "zm_gat",
+            "label": "gatilho",
+            "kind": "decision",
+            "info": "δ = 15%: zona morta |ln D| ≤ 0,1398.",
+            "layer": 2
+          },
+          {
+            "id": "zm_rec",
+            "label": "Recomendação",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          }
+        ],
+        "edges": [
+          {
+            "from": "zm_pol",
+            "to": "zm_gat",
+            "label": "P*",
+            "style": "solid",
+            "id": "ezm1"
+          },
+          {
+            "from": "zm_gat",
+            "to": "zm_rec",
+            "label": "sem recomendação",
+            "style": "solid",
+            "id": "ezm2"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "title": "Preço vigente perto do alvo",
+          "detail": "Paga 580; P* = 614,27; D = 0,944.",
+          "active": [
+            "zm_pol"
+          ],
+          "state": {
+            "preco_vigente": 580,
+            "preco_alvo": 614.27
+          }
+        },
+        {
+          "title": "Dentro da zona morta",
+          "detail": "|ln(580/614,27)| = 0,057 ≤ ln 1,15 = 0,140 → nenhuma recomendação (evita revisão por ruído, Eq. 74–75).",
+          "active": [
+            "zm_pol",
+            "zm_gat",
+            "zm_rec"
+          ],
+          "state": {
+            "gatilho": "nao_dispara",
+            "recomendacao": "nenhuma"
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "κ fora de κ̄",
+      "graph": {
+        "direction": "LR",
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ],
+        "nodes": [
+          {
+            "id": "kp_ges",
+            "label": "Gestor",
+            "kind": "actor",
+            "info": "Tenta ajustar κ do cliente da Tabela 7.",
+            "layer": 0
+          },
+          {
+            "id": "kp_pol",
+            "label": "politica.preco_alvo",
+            "kind": "decision",
+            "info": "κ̄ = 1,2 (D12 revisada).",
+            "layer": 2
+          }
+        ],
+        "edges": [
+          {
+            "from": "kp_ges",
+            "to": "kp_pol",
+            "label": "κ",
+            "style": "solid",
+            "id": "ekp1"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "title": "κ acima do teto",
+          "detail": "κ = 1,3 > κ̄ = 1,2 → rejeitado com erro de domínio; nenhum preço criado.",
+          "active": [
+            "kp_ges",
+            "kp_pol"
+          ],
+          "state": {
+            "kappa": 1.3,
+            "resultado": "rejeitado"
+          }
+        },
+        {
+          "title": "κ abaixo de 1",
+          "detail": "κ = 0,9 quebraria A1/A2 → rejeitado; desconto comercial vai em 'desconto negociado'.",
+          "active": [
+            "kp_ges",
+            "kp_pol"
+          ],
+          "state": {
+            "kappa": 0.9,
+            "resultado": "rejeitado"
+          }
+        },
+        {
+          "title": "κ no teto",
+          "detail": "κ = 1,2 → P* = 1,2 × 614,2725 = 737,13.",
+          "active": [
+            "kp_ges",
+            "kp_pol"
+          ],
+          "state": {
+            "kappa": 1.2,
+            "resultado": "aceito",
+            "preco_alvo": 737.13
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Conector indisponível",
+      "graph": {
+        "direction": "LR",
+        "nodes": [
+          {
+            "id": "w",
+            "label": "motores",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "con",
+            "label": "a_dom",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "job",
+            "label": "core.job",
+            "kind": "queue",
+            "info": "",
+            "layer": 3
+          },
+          {
+            "id": "raw",
+            "label": "raw.extracao",
+            "kind": "data",
+            "info": "",
+            "layer": 3
+          },
+          {
+            "id": "adm",
+            "label": "administrador",
+            "kind": "actor",
+            "info": "",
+            "layer": 0
+          }
+        ],
+        "edges": [
+          {
+            "from": "w",
+            "to": "job",
+            "label": "consome",
+            "style": "solid",
+            "id": "e0"
+          },
+          {
+            "from": "w",
+            "to": "con",
+            "label": "extrair",
+            "style": "solid",
+            "id": "e1"
+          },
+          {
+            "from": "w",
+            "to": "raw",
+            "label": "grava",
+            "style": "solid",
+            "id": "e2"
+          },
+          {
+            "from": "adm",
+            "to": "raw",
+            "label": "planilha",
+            "style": "solid",
+            "id": "e3"
+          }
+        ],
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ]
+      },
+      "steps": [
+        {
+          "title": "Job extrair inicia",
+          "detail": "O worker pega o job da competência fechada.",
+          "active": [
+            "w",
+            "job"
+          ],
+          "state": {
+            "job_estado": "em_execucao",
+            "tentativas": 1
+          }
+        },
+        {
+          "title": "ODBC não responde",
+          "detail": "Tempo esgotado na conexão: erro transitório, nada gravado.",
+          "active": [
+            "w",
+            "con"
+          ],
+          "state": {
+            "erro": "ConectorIndisponivel",
+            "extracoes_gravadas": 0
+          }
+        },
+        {
+          "title": "Volta para a fila com backoff",
+          "detail": "Espera 60 s × 2^(n−1), com teto de 1 h.",
+          "active": [
+            "w",
+            "job"
+          ],
+          "state": {
+            "job_estado": "pendente",
+            "espera_s": 60
+          }
+        },
+        {
+          "title": "Credencial recusada não repete",
+          "detail": "Erro permanente vai direto a falhou, sem gastar tentativas.",
+          "active": [
+            "w",
+            "con",
+            "job"
+          ],
+          "state": {
+            "erro_permanente": "CredencialInvalida",
+            "job_estado_permanente": "falhou"
+          }
+        },
+        {
+          "title": "Tentativas esgotadas",
+          "detail": "Na 5ª falha o job fica falhou e gera alerta.",
+          "active": [
+            "w",
+            "job"
+          ],
+          "state": {
+            "job_estado": "falhou",
+            "tentativas": 5,
+            "alerta": "job_falhou"
+          }
+        },
+        {
+          "title": "Planilha como plano B",
+          "detail": "O administrador importa a planilha da mesma competência: nova versão, origem planilha, sem duplicar.",
+          "active": [
+            "adm",
+            "raw"
+          ],
+          "state": {
+            "extracao_origem": "planilha",
+            "extracao_versao": 1,
+            "extracoes_gravadas": 1
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Competência sem vínculo",
+      "graph": {
+        "direction": "LR",
+        "nodes": [
+          {
+            "id": "imp",
+            "label": "uc_import",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "vin",
+            "label": "uc_vinc",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "rec",
+            "label": "m_recal",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "adm",
+            "label": "administrador",
+            "kind": "actor",
+            "info": "",
+            "layer": 0
+          }
+        ],
+        "edges": [
+          {
+            "from": "imp",
+            "to": "vin",
+            "label": "pendências",
+            "style": "solid",
+            "id": "e0"
+          },
+          {
+            "from": "adm",
+            "to": "vin",
+            "label": "vincula",
+            "style": "solid",
+            "id": "e1"
+          },
+          {
+            "from": "vin",
+            "to": "rec",
+            "label": "próxima recalibração",
+            "style": "solid",
+            "id": "e2"
+          }
+        ],
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ]
+      },
+      "steps": [
+        {
+          "title": "Empresa com horas sem contrato",
+          "detail": "A empresa E9 tem horas na competência e nenhum vínculo vigente.",
+          "active": [
+            "imp",
+            "vin"
+          ],
+          "state": {
+            "pendencias": [
+              "E9"
+            ]
+          }
+        },
+        {
+          "title": "Fora do cálculo, nunca em silêncio",
+          "detail": "A recalibração ignora E9 e a lista no resultado.",
+          "active": [
+            "vin",
+            "rec"
+          ],
+          "state": {
+            "empresas_no_calculo": 0,
+            "empresas_sem_vinculo": [
+              "E9"
+            ]
+          }
+        },
+        {
+          "title": "Vínculo feito depois",
+          "detail": "O administrador cria o vínculo com desde na competência.",
+          "active": [
+            "adm",
+            "vin"
+          ],
+          "state": {
+            "pendencias": [],
+            "vinculo_estado": "vigente"
+          }
+        },
+        {
+          "title": "Sem recálculo automático",
+          "detail": "A competência já recalibrada não muda; E9 entra na recalibração seguinte.",
+          "active": [
+            "vin",
+            "rec"
+          ],
+          "state": {
+            "recalculo_automatico": false,
+            "empresas_no_calculo_seguinte": 1
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Reuso de refresh",
+      "graph": {
+        "direction": "LR",
+        "nodes": [
+          {
+            "id": "spa",
+            "label": "spa",
+            "kind": "client",
+            "info": "",
+            "layer": 0
+          },
+          {
+            "id": "auth",
+            "label": "uc_auth",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "sess",
+            "label": "sessões",
+            "kind": "data",
+            "info": "",
+            "layer": 3
+          },
+          {
+            "id": "aud",
+            "label": "auditoria",
+            "kind": "data",
+            "info": "",
+            "layer": 3
+          }
+        ],
+        "edges": [
+          {
+            "from": "spa",
+            "to": "auth",
+            "label": "renovar",
+            "style": "solid",
+            "id": "e0"
+          },
+          {
+            "from": "auth",
+            "to": "sess",
+            "label": "rotaciona",
+            "style": "solid",
+            "id": "e1"
+          },
+          {
+            "from": "auth",
+            "to": "aud",
+            "label": "audita",
+            "style": "solid",
+            "id": "e2"
+          }
+        ],
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ]
+      },
+      "steps": [
+        {
+          "title": "Sessão aberta",
+          "detail": "Login com TOTP cria a família com o token R1.",
+          "active": [
+            "spa",
+            "auth",
+            "sess"
+          ],
+          "state": {
+            "familia": "ativa",
+            "token_vigente": "R1"
+          }
+        },
+        {
+          "title": "Renovação normal",
+          "detail": "R1 é usado e rotacionado para R2.",
+          "active": [
+            "spa",
+            "auth",
+            "sess"
+          ],
+          "state": {
+            "status": 200,
+            "token_vigente": "R2"
+          }
+        },
+        {
+          "title": "Duas abas, dentro da janela",
+          "detail": "R1 reapresentado em até 10 s responde 409 e não revoga: a aba relê o cookie.",
+          "active": [
+            "spa",
+            "auth"
+          ],
+          "state": {
+            "status": 409,
+            "familia": "ativa"
+          }
+        },
+        {
+          "title": "Reuso fora da janela",
+          "detail": "R1 reapresentado depois de 10 s revoga a família e audita.",
+          "active": [
+            "spa",
+            "auth",
+            "sess",
+            "aud"
+          ],
+          "state": {
+            "status": 401,
+            "familia": "revogada",
+            "auditoria": "refresh_reusado"
+          }
+        },
+        {
+          "title": "Token vigente também cai",
+          "detail": "Renovar com R2 depois da revogação responde 401.",
+          "active": [
+            "spa",
+            "auth",
+            "sess"
+          ],
+          "state": {
+            "status": 401
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Contrato fora da janela de reajuste",
+      "graph": {
+        "direction": "LR",
+        "nodes": [
+          {
+            "id": "rec",
+            "label": "m_recal",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "c1",
+            "label": "contrato A (mês 3)",
+            "kind": "data",
+            "info": "",
+            "layer": 3
+          },
+          {
+            "id": "c2",
+            "label": "contrato B (mês 7)",
+            "kind": "data",
+            "info": "",
+            "layer": 3
+          },
+          {
+            "id": "r",
+            "label": "recomendações",
+            "kind": "data",
+            "info": "",
+            "layer": 3
+          }
+        ],
+        "edges": [
+          {
+            "from": "rec",
+            "to": "c1",
+            "label": "avalia",
+            "style": "solid",
+            "id": "e0"
+          },
+          {
+            "from": "rec",
+            "to": "c2",
+            "label": "avalia",
+            "style": "solid",
+            "id": "e1"
+          },
+          {
+            "from": "rec",
+            "to": "r",
+            "label": "grava",
+            "style": "solid",
+            "id": "e2"
+          }
+        ],
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ]
+      },
+      "steps": [
+        {
+          "title": "Recalibração de janeiro",
+          "detail": "Antecedência de 2 meses: o efeito cai em março (D7).",
+          "active": [
+            "rec"
+          ],
+          "state": {
+            "competencia": "2027-01",
+            "mes_de_efeito": 3
+          }
+        },
+        {
+          "title": "Contrato na janela",
+          "detail": "O contrato A reajusta em março e recebe recomendação.",
+          "active": [
+            "rec",
+            "c1",
+            "r"
+          ],
+          "state": {
+            "contrato_a": "recomendacao_pendente"
+          }
+        },
+        {
+          "title": "Contrato fora da janela",
+          "detail": "O contrato B fica monitorado: preço-alvo gravado, sem recomendação.",
+          "active": [
+            "rec",
+            "c2"
+          ],
+          "state": {
+            "contrato_b": "monitorado",
+            "preco_alvo_gravado": true,
+            "recomendacoes": 1
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Falha na exportação",
+      "graph": {
+        "direction": "LR",
+        "nodes": [
+          {
+            "id": "d",
+            "label": "d_exp",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "a",
+            "label": "a_expf",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "r",
+            "label": "recomendação",
+            "kind": "data",
+            "info": "",
+            "layer": 3
+          },
+          {
+            "id": "g",
+            "label": "gestor",
+            "kind": "actor",
+            "info": "",
+            "layer": 0
+          }
+        ],
+        "edges": [
+          {
+            "from": "d",
+            "to": "a",
+            "label": "gera arquivo",
+            "style": "solid",
+            "id": "e0"
+          },
+          {
+            "from": "d",
+            "to": "r",
+            "label": "estado",
+            "style": "solid",
+            "id": "e1"
+          },
+          {
+            "from": "g",
+            "to": "d",
+            "label": "nova tentativa",
+            "style": "solid",
+            "id": "e2"
+          }
+        ],
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ]
+      },
+      "steps": [
+        {
+          "title": "Aprovada aguardando lote",
+          "detail": "O lote é identificado pelo hash das recomendações.",
+          "active": [
+            "d",
+            "r"
+          ],
+          "state": {
+            "recomendacao": "aprovada",
+            "lote": "L1"
+          }
+        },
+        {
+          "title": "Geração falha",
+          "detail": "O arquivo não é gravado e o job tenta de novo.",
+          "active": [
+            "d",
+            "a"
+          ],
+          "state": {
+            "job_estado": "pendente",
+            "arquivos": 0
+          }
+        },
+        {
+          "title": "Tentativas esgotadas",
+          "detail": "A recomendação passa a falha de exportação, com alerta.",
+          "active": [
+            "d",
+            "r"
+          ],
+          "state": {
+            "recomendacao": "falha_exportacao",
+            "job_estado": "falhou",
+            "alerta": "exportacao_falhou"
+          }
+        },
+        {
+          "title": "Recalibração seguinte não mexe",
+          "detail": "Não expira e o contrato é pulado.",
+          "active": [
+            "r"
+          ],
+          "state": {
+            "recomendacao": "falha_exportacao",
+            "novas_recomendacoes": 0
+          }
+        },
+        {
+          "title": "Nova tentativa manual",
+          "detail": "Reusa o mesmo lote: um único arquivo no final.",
+          "active": [
+            "g",
+            "d",
+            "a",
+            "r"
+          ],
+          "state": {
+            "recomendacao": "exportada",
+            "lote": "L1",
+            "arquivos": 1
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Divergência na conciliação",
+      "graph": {
+        "direction": "LR",
+        "nodes": [
+          {
+            "id": "c",
+            "label": "uc_conc",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "d",
+            "label": "divergência",
+            "kind": "data",
+            "info": "",
+            "layer": 3
+          },
+          {
+            "id": "g",
+            "label": "gestor",
+            "kind": "actor",
+            "info": "",
+            "layer": 0
+          }
+        ],
+        "edges": [
+          {
+            "from": "c",
+            "to": "d",
+            "label": "abre",
+            "style": "solid",
+            "id": "e0"
+          },
+          {
+            "from": "g",
+            "to": "d",
+            "label": "decide",
+            "style": "solid",
+            "id": "e1"
+          }
+        ],
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ]
+      },
+      "steps": [
+        {
+          "title": "Cobrado difere do aprovado",
+          "detail": "Aprovado 502,55 e cobrado 480,00.",
+          "active": [
+            "c",
+            "d"
+          ],
+          "state": {
+            "aprovado": 502.55,
+            "cobrado": 480,
+            "situacao": "aberta",
+            "alerta": "divergencia"
+          }
+        },
+        {
+          "title": "Valores iguais não abrem",
+          "detail": "Diferença de centavos zerada não gera divergência.",
+          "active": [
+            "c"
+          ],
+          "state": {
+            "divergencias_novas": 0
+          }
+        },
+        {
+          "title": "Gestor justifica",
+          "detail": "O motivo fica registrado e auditado.",
+          "active": [
+            "g",
+            "d"
+          ],
+          "state": {
+            "situacao": "justificada",
+            "auditoria": "divergencia_justificada"
+          }
+        },
+        {
+          "title": "Encerramento",
+          "detail": "O gestor encerra a divergência.",
+          "active": [
+            "g",
+            "d"
+          ],
+          "state": {
+            "situacao": "resolvida"
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Portão de aceite reprovado",
+      "graph": {
+        "direction": "LR",
+        "nodes": [
+          {
+            "id": "e",
+            "label": "uc_estimar",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "m",
+            "label": "m_teq",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "p",
+            "label": "política",
+            "kind": "data",
+            "info": "",
+            "layer": 3
+          },
+          {
+            "id": "g",
+            "label": "gestor",
+            "kind": "actor",
+            "info": "",
+            "layer": 0
+          }
+        ],
+        "edges": [
+          {
+            "from": "e",
+            "to": "m",
+            "label": "estima",
+            "style": "solid",
+            "id": "e0"
+          },
+          {
+            "from": "e",
+            "to": "p",
+            "label": "rascunho",
+            "style": "solid",
+            "id": "e1"
+          },
+          {
+            "from": "g",
+            "to": "p",
+            "label": "decide",
+            "style": "solid",
+            "id": "e2"
+          }
+        ],
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ]
+      },
+      "steps": [
+        {
+          "title": "Estimação anual",
+          "detail": "Huber estima os β novos na amostra de ajuste.",
+          "active": [
+            "e",
+            "m"
+          ],
+          "state": {
+            "job_tipo": "estimar_politica"
+          }
+        },
+        {
+          "title": "Erro fora da amostra piora",
+          "detail": "EAM da nova equação acima de 1,05 × o da vigente.",
+          "active": [
+            "e",
+            "m"
+          ],
+          "state": {
+            "portao": "reprovado",
+            "motivo": "erro_fora_da_amostra"
+          }
+        },
+        {
+          "title": "Fica como rascunho marcado",
+          "detail": "O relatório mostra a comparação; nada é publicado.",
+          "active": [
+            "e",
+            "p"
+          ],
+          "state": {
+            "politica_estado": "rascunho",
+            "portao_aceite": false
+          }
+        },
+        {
+          "title": "Publicação recusada",
+          "detail": "Publicar com portão reprovado responde 409.",
+          "active": [
+            "g",
+            "p"
+          ],
+          "state": {
+            "status": 409,
+            "politica_vigente_mudou": false
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Isolamento entre tenants",
+      "graph": {
+        "direction": "LR",
+        "nodes": [
+          {
+            "id": "a",
+            "label": "usuário do tenant A",
+            "kind": "actor",
+            "info": "",
+            "layer": 0
+          },
+          {
+            "id": "api",
+            "label": "api",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "uow",
+            "label": "a_db (UoW)",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "pg",
+            "label": "pg (RLS)",
+            "kind": "data",
+            "info": "",
+            "layer": 3
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "api",
+            "label": "Bearer tenant A",
+            "style": "solid",
+            "id": "e0"
+          },
+          {
+            "from": "api",
+            "to": "uow",
+            "label": "app.tenant_id",
+            "style": "solid",
+            "id": "e1"
+          },
+          {
+            "from": "uow",
+            "to": "pg",
+            "label": "SQL",
+            "style": "solid",
+            "id": "e2"
+          }
+        ],
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ]
+      },
+      "steps": [
+        {
+          "title": "Token do tenant A",
+          "detail": "A transação fixa app.tenant_id = A.",
+          "active": [
+            "a",
+            "api",
+            "uow"
+          ],
+          "state": {
+            "app_tenant_id": "A"
+          }
+        },
+        {
+          "title": "Leitura de recurso do tenant B",
+          "detail": "O id existe, mas a RLS não retorna a linha.",
+          "active": [
+            "a",
+            "api",
+            "uow",
+            "pg"
+          ],
+          "state": {
+            "status": 404,
+            "linhas": 0
+          }
+        },
+        {
+          "title": "Escrita no tenant B",
+          "detail": "O WITH CHECK da política recusa.",
+          "active": [
+            "uow",
+            "pg"
+          ],
+          "state": {
+            "escrita_recusada": true
+          }
+        },
+        {
+          "title": "Sem tenant definido",
+          "detail": "Sem app.tenant_id, nenhuma linha aparece.",
+          "active": [
+            "uow",
+            "pg"
+          ],
+          "state": {
+            "linhas_sem_tenant": 0
+          }
+        },
+        {
+          "title": "Toda tabela coberta",
+          "detail": "O catálogo confirma RLS forçada em todas as tabelas com tenant_id.",
+          "active": [
+            "pg"
+          ],
+          "state": {
+            "tabelas_sem_rls": 0
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Worker que morre no meio do job",
+      "graph": {
+        "direction": "LR",
+        "nodes": [
+          {
+            "id": "w1",
+            "label": "worker 1",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "w2",
+            "label": "worker 2",
+            "kind": "service",
+            "info": "",
+            "layer": 2
+          },
+          {
+            "id": "job",
+            "label": "core.job",
+            "kind": "queue",
+            "info": "",
+            "layer": 3
+          }
+        ],
+        "edges": [
+          {
+            "from": "w1",
+            "to": "job",
+            "label": "lease",
+            "style": "solid",
+            "id": "e0"
+          },
+          {
+            "from": "w2",
+            "to": "job",
+            "label": "recupera",
+            "style": "solid",
+            "id": "e1"
+          }
+        ],
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ]
+      },
+      "steps": [
+        {
+          "title": "Worker 1 pega o job",
+          "detail": "O lease vale 5 minutos e é renovado por heartbeat.",
+          "active": [
+            "w1",
+            "job"
+          ],
+          "state": {
+            "job_estado": "em_execucao",
+            "tentativas": 1,
+            "lease_dono": "w1"
+          }
+        },
+        {
+          "title": "Worker 1 morre",
+          "detail": "Sem heartbeat, o lease vence.",
+          "active": [
+            "w1",
+            "job"
+          ],
+          "state": {
+            "heartbeat": "parado"
+          }
+        },
+        {
+          "title": "Órfão recuperado",
+          "detail": "A varredura devolve o job vencido à fila.",
+          "active": [
+            "w2",
+            "job"
+          ],
+          "state": {
+            "job_estado": "pendente",
+            "orfaos_recuperados": 1
+          }
+        },
+        {
+          "title": "Worker 2 conclui",
+          "detail": "Reexecução idempotente: um único resultado.",
+          "active": [
+            "w2",
+            "job"
+          ],
+          "state": {
+            "job_estado": "concluido",
+            "tentativas": 2,
+            "lease_dono": "w2",
+            "resultados": 1
+          }
+        },
+        {
+          "title": "Worker 1 volta atrasado",
+          "detail": "Concluir com lease perdido é recusado.",
+          "active": [
+            "w1",
+            "job"
+          ],
+          "state": {
+            "conclusao_recusada": true,
+            "resultados": 1
+          }
+        }
+      ]
+    },
+    {
+      "type": "mermaid",
+      "label": "Estados do job",
+      "code": "stateDiagram-v2\n  [*] --> Pendente: INSERT ... ON CONFLICT DO NOTHING (chave_idempotencia)\n  Pendente --> EmExecucao: SKIP LOCKED; tentativas+1; lease_ate = agora + 5 min\n  EmExecucao --> EmExecucao: heartbeat a cada 60 s renova lease_ate\n  EmExecucao --> Concluido: sucesso\n  EmExecucao --> Pendente: erro transitório e tentativas < 5 (backoff)\n  EmExecucao --> Pendente: lease vencido (órfão, conta a tentativa)\n  EmExecucao --> Falhou: erro permanente ou tentativas = 5 (alerta)\n  Falhou --> Pendente: nova tentativa manual (zera tentativas)\n  Concluido --> [*]"
+    },
+    {
+      "type": "mermaid",
+      "label": "Estados do contrato",
+      "code": "stateDiagram-v2\n  [*] --> Provisorio: cotação aceita ou contrato sem histórico (ℓ < 2)\n  [*] --> Definitivo: carga histórica com ℓ = 2\n  Provisorio --> Definitivo: primeira recalibração com ℓ = 2 (revisão integral, sem θ)\n  Definitivo --> Provisorio: mudança de regime (D13, ℓ recalculado)\n  Provisorio --> Encerrado: rescisão\n  Definitivo --> Encerrado: rescisão\n  Encerrado --> [*]"
+    },
+    {
+      "type": "mermaid",
+      "label": "Estados do vínculo",
+      "code": "stateDiagram-v2\n  [*] --> PendenteVinculo: empresa com horas e sem contrato na competência\n  [*] --> Vigente: vínculo criado (desde)\n  PendenteVinculo --> Vigente: administrador vincula\n  Vigente --> Encerrado: até preenchido\n  Encerrado --> [*]"
+    },
+    {
+      "type": "mermaid",
+      "label": "Estados da divergência",
+      "code": "stateDiagram-v2\n  [*] --> Aberta: aprovado ≠ cobrado na conciliação (alerta)\n  Aberta --> Justificada: gestor registra o motivo\n  Aberta --> Resolvida: cobrança corrigida na importação seguinte\n  Justificada --> Resolvida: encerrada pelo gestor\n  Resolvida --> [*]"
+    },
+    {
+      "type": "simulation",
+      "label": "Cotação sem histórico",
+      "graph": {
+        "direction": "LR",
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ],
+        "nodes": [
+          {
+            "id": "cs_ana",
+            "label": "Analista",
+            "kind": "actor",
+            "info": "Cota um cliente novo.",
+            "layer": 0
+          },
+          {
+            "id": "cs_cot",
+            "label": "d_cot",
+            "kind": "service",
+            "info": "k_inf com a política vigente em memória.",
+            "layer": 2
+          },
+          {
+            "id": "cs_pol",
+            "label": "política vigente",
+            "kind": "decision",
+            "info": "π_LP = 235, τ = 103,5, κ̄ = 1,2, s²/v² = 2.",
+            "layer": 2
+          }
+        ],
+        "edges": [
+          {
+            "from": "cs_ana",
+            "to": "cs_cot",
+            "label": "POST /cotacoes",
+            "style": "solid",
+            "id": "ecs1"
+          },
+          {
+            "from": "cs_cot",
+            "to": "cs_pol",
+            "label": "regra de preço",
+            "style": "solid",
+            "id": "ecs2"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "title": "Regime LP, 0 meses",
+          "detail": "Preço provisório = piso do regime = 235,00; nível 0; Z = 0.",
+          "active": [
+            "cs_ana",
+            "cs_cot",
+            "cs_pol"
+          ],
+          "state": {
+            "regime": "LP",
+            "meses": 0,
+            "preco": 235.0,
+            "provisorio": true
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Cotação com histórico parcial",
+      "graph": {
+        "direction": "LR",
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ],
+        "nodes": [
+          {
+            "id": "cp_ana",
+            "label": "Analista",
+            "kind": "actor",
+            "info": "Cota um cliente novo.",
+            "layer": 0
+          },
+          {
+            "id": "cp_cot",
+            "label": "d_cot",
+            "kind": "service",
+            "info": "k_inf com a política vigente em memória.",
+            "layer": 2
+          },
+          {
+            "id": "cp_pol",
+            "label": "política vigente",
+            "kind": "decision",
+            "info": "π_LP = 235, τ = 103,5, κ̄ = 1,2, s²/v² = 2.",
+            "layer": 2
+          }
+        ],
+        "edges": [
+          {
+            "from": "cp_ana",
+            "to": "cp_cot",
+            "label": "POST /cotacoes",
+            "style": "solid",
+            "id": "ecp1"
+          },
+          {
+            "from": "cp_cot",
+            "to": "cp_pol",
+            "label": "regra de preço",
+            "style": "solid",
+            "id": "ecp2"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "title": "4 meses, H_pad = 3 h",
+          "detail": "Z = 4/(4+2) = 2/3; base própria = max(235; 103,5·3 = 310,5) = 310,5.",
+          "active": [
+            "cp_cot",
+            "cp_pol"
+          ],
+          "state": {
+            "meses": 4,
+            "z": 0.6667,
+            "base_propria": 310.5
+          }
+        },
+        {
+          "title": "Preço",
+          "detail": "P = 2/3·310,5 + 1/3·235 = 285,33; com κ = 1,1 vira 313,87.",
+          "active": [
+            "cp_ana",
+            "cp_cot"
+          ],
+          "state": {
+            "preco": 285.33,
+            "preco_kappa_1_1": 313.87,
+            "provisorio": true
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Regime ausente na cotação",
+      "graph": {
+        "direction": "LR",
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ],
+        "nodes": [
+          {
+            "id": "cr_ana",
+            "label": "Analista",
+            "kind": "actor",
+            "info": "Cota um cliente novo.",
+            "layer": 0
+          },
+          {
+            "id": "cr_cot",
+            "label": "d_cot",
+            "kind": "service",
+            "info": "k_inf com a política vigente em memória.",
+            "layer": 2
+          }
+        ],
+        "edges": [
+          {
+            "from": "cr_ana",
+            "to": "cr_cot",
+            "label": "POST /cotacoes",
+            "style": "solid",
+            "id": "ecr1"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "title": "Corpo sem regime",
+          "detail": "422 na validação do corpo; nada é gravado (ADR-004 item 2: o regime é obrigatório, não existe nível 0).",
+          "active": [
+            "cr_ana",
+            "cr_cot"
+          ],
+          "state": {
+            "status": 422,
+            "gravado": false
+          }
+        },
+        {
+          "title": "Regime inexistente",
+          "detail": "'XX' também é 422.",
+          "active": [
+            "cr_ana",
+            "cr_cot"
+          ],
+          "state": {
+            "status": 422
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Cotação sem política publicada",
+      "graph": {
+        "direction": "LR",
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ],
+        "nodes": [
+          {
+            "id": "cn_ana",
+            "label": "Analista",
+            "kind": "actor",
+            "info": "Cota um cliente novo.",
+            "layer": 0
+          },
+          {
+            "id": "cn_cot",
+            "label": "d_cot",
+            "kind": "service",
+            "info": "k_inf com a política vigente em memória.",
+            "layer": 2
+          },
+          {
+            "id": "cn_pol",
+            "label": "política vigente",
+            "kind": "decision",
+            "info": "π_LP = 235, τ = 103,5, κ̄ = 1,2, s²/v² = 2.",
+            "layer": 2
+          }
+        ],
+        "edges": [
+          {
+            "from": "cn_ana",
+            "to": "cn_cot",
+            "label": "POST /cotacoes",
+            "style": "solid",
+            "id": "ecn1"
+          },
+          {
+            "from": "cn_cot",
+            "to": "cn_pol",
+            "label": "regra de preço",
+            "style": "solid",
+            "id": "ecn2"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "title": "Nenhuma versão publicada",
+          "detail": "409: 'publique uma política antes de cotar'; nenhuma cotação gravada.",
+          "active": [
+            "cn_ana",
+            "cn_cot",
+            "cn_pol"
+          ],
+          "state": {
+            "status": 409,
+            "gravado": false
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Política desatualizada na memória",
+      "graph": {
+        "direction": "LR",
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ],
+        "nodes": [
+          {
+            "id": "cd_ana",
+            "label": "Analista",
+            "kind": "actor",
+            "info": "Cota um cliente novo.",
+            "layer": 0
+          },
+          {
+            "id": "cd_cot",
+            "label": "d_cot",
+            "kind": "service",
+            "info": "k_inf com a política vigente em memória.",
+            "layer": 2
+          },
+          {
+            "id": "cd_pol",
+            "label": "política vigente",
+            "kind": "decision",
+            "info": "π_LP = 235, τ = 103,5, κ̄ = 1,2, s²/v² = 2.",
+            "layer": 2
+          }
+        ],
+        "edges": [
+          {
+            "from": "cd_ana",
+            "to": "cd_cot",
+            "label": "POST /cotacoes",
+            "style": "solid",
+            "id": "ecd1"
+          },
+          {
+            "from": "cd_cot",
+            "to": "cd_pol",
+            "label": "regra de preço",
+            "style": "solid",
+            "id": "ecd2"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "title": "v1 em memória, v2 publicada",
+          "detail": "A versão publicada é conferida a cada requisição; a memória é descartada e recarregada.",
+          "active": [
+            "cd_cot",
+            "cd_pol"
+          ],
+          "state": {
+            "memoria": 1,
+            "publicada": 2
+          }
+        },
+        {
+          "title": "Nova cotação",
+          "detail": "Piso LP passa a 250,00 e a cotação grava política v2.",
+          "active": [
+            "cd_ana",
+            "cd_cot"
+          ],
+          "state": {
+            "preco": 250.0,
+            "politica_versao": 2
+          }
+        },
+        {
+          "title": "Reprodução da antiga",
+          "detail": "GET /cotacoes/{id}/reproducao refaz com a v1 gravada: 235,00 = 235,00.",
+          "active": [
+            "cd_ana",
+            "cd_cot"
+          ],
+          "state": {
+            "gravado": 235.0,
+            "recalculado": 235.0
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Provisório revisado em ℓ = 2",
+      "graph": {
+        "direction": "LR",
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ],
+        "nodes": [
+          {
+            "id": "cv_ctr",
+            "label": "Contrato provisório",
+            "kind": "actor",
+            "info": "Preço vigente 437; 12 meses de direcionadores chegaram.",
+            "layer": 0
+          },
+          {
+            "id": "cv_rec",
+            "label": "m_recal",
+            "kind": "service",
+            "info": "Algoritmo 3, linha 1.",
+            "layer": 2
+          },
+          {
+            "id": "cv_tr",
+            "label": "transicao",
+            "kind": "decision",
+            "info": "θ = 15%.",
+            "layer": 2
+          }
+        ],
+        "edges": [
+          {
+            "from": "cv_ctr",
+            "to": "cv_rec",
+            "label": "ℓ = 2",
+            "style": "solid",
+            "id": "ecv1"
+          },
+          {
+            "from": "cv_rec",
+            "to": "cv_tr",
+            "label": "revisão integral",
+            "style": "solid",
+            "id": "ecv2"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "title": "Com teto θ",
+          "detail": "Sem a regra especial o reajuste seria limitado: 437 → 502,55.",
+          "active": [
+            "cv_rec",
+            "cv_tr"
+          ],
+          "state": {
+            "preco": 502.55
+          }
+        },
+        {
+          "title": "Revisão integral",
+          "detail": "O provisório em ℓ = 2 vai direto ao alvo, sem θ: 437 → 614,27; trajetória de 1 passo.",
+          "active": [
+            "cv_ctr",
+            "cv_rec",
+            "cv_tr"
+          ],
+          "state": {
+            "preco": 614.27,
+            "trajetoria": [
+              614.27
+            ]
+          }
+        },
+        {
+          "title": "Contrato definitivo",
+          "detail": "Aprovado o preço, o contrato deixa de ser provisório.",
+          "active": [
+            "cv_ctr"
+          ],
+          "state": {
+            "provisorio": false
+          }
+        }
+      ]
+    },
+    {
+      "type": "simulation",
+      "label": "Cotação vira contrato provisório",
+      "graph": {
+        "direction": "LR",
+        "layers": [
+          "Usuários",
+          "Borda",
+          "Serviços",
+          "Dados",
+          "Externos"
+        ],
+        "nodes": [
+          {
+            "id": "cc_ana",
+            "label": "Analista",
+            "kind": "actor",
+            "info": "Cliente aceitou a cotação.",
+            "layer": 0
+          },
+          {
+            "id": "cc_cot",
+            "label": "Cotação",
+            "kind": "service",
+            "info": "Registro com entradas e versão.",
+            "layer": 2
+          },
+          {
+            "id": "cc_ctr",
+            "label": "Contrato",
+            "kind": "decision",
+            "info": "Nasce pela importação do Domínio/Omie.",
+            "layer": 2
+          }
+        ],
+        "edges": [
+          {
+            "from": "cc_ana",
+            "to": "cc_cot",
+            "label": "aceite",
+            "style": "solid",
+            "id": "ecc1"
+          },
+          {
+            "from": "cc_cot",
+            "to": "cc_ctr",
+            "label": "vínculo manual",
+            "style": "solid",
+            "id": "ecc2"
+          }
+        ]
+      },
+      "steps": [
+        {
+          "title": "Decisão de desenho (D-COT)",
+          "detail": "A cotação fica como registro de venda e não cria contrato sozinha: o contrato nasce na importação, provisório, e o vínculo é feito por quem importa.",
+          "active": [
+            "cc_ana",
+            "cc_cot",
+            "cc_ctr"
+          ],
+          "state": {
+            "cria_contrato": false
+          }
+        },
+        {
+          "title": "Primeira recalibração",
+          "detail": "O contrato importado com menos de 12 meses entra provisório (D13) e aparece no relatório de provisórios abaixo do esforço.",
+          "active": [
+            "cc_ctr"
+          ],
+          "state": {
+            "provisorio": true
+          }
+        }
+      ]
+    },
+    {
+      "type": "markdown",
+      "label": "Parâmetros e regras de F1",
+      "content": "# Parâmetros e regras de F1 (F1.2 a F1.5)\n\nTodos os valores são parâmetros de configuração. Decisões do agente, por delegação do responsável, registradas em `decisoes.md`.\n\n## Fila (F1.2)\n\n| Parâmetro | Valor |\n|---|---|\n| Tentativas | 5 |\n| Backoff | 60 s × 2^(n−1), teto de 1 h, ±10% de variação aleatória |\n| Lease / heartbeat | 5 min / 60 s |\n| Varredura de órfãos | a cada 60 s; lease vencido volta a pendente e conta a tentativa |\n| Alerta | job em `falhou` |\n\n| Job | Chave de idempotência |\n|---|---|\n| extrair | tenant, `extrair`, fonte, competência, versão da extração |\n| reextrair | igual a extrair, com a versão seguinte |\n| recalibrar | tenant, `recalibrar`, competência |\n| estimar_politica | tenant, `estimar_politica`, ano |\n| exportar | tenant, `exportar`, hash das recomendações do lote |\n\n## Recomendação e política (F1.3)\n\n- Decisão concorrente: coluna `versao` na recomendação; versão antiga responde 409.\n- Aprovada não exportada não expira; a recalibração seguinte pula o contrato e alerta.\n- Política publicada errada: corrige-se publicando nova versão e a recalibração expira as pendentes. **Estado Revogada fica como opção** para o portão F1 (D-REVOG).\n\n## Regras pendentes (F1.5)\n\n| Item | Decisão |\n|---|---|\n| INDICE_INFLACAO | Global, em `core`, sem `tenant_id`; o papel `dynaprice_app` só lê; carga pela cli |\n| Revisão do provisório | Avaliado a cada recalibração enquanto ℓ < 2; a revisão integral sai na primeira recalibração com ℓ = 2, fora da janela de reajuste (ADR-004) |\n| Portão de aceite das equações | EAM fora da amostra (20% separados com semente fixa) ≤ 1,05 × EAM da política vigente; sem vigente, todos os β ≥ 0 |\n| Cadeia de hash | `seq` por tenant, serializada com `pg_advisory_xact_lock` do tenant na transação |\n| Recarga da política | NOTIFY, recarga ao reconectar o LISTEN e conferência da versão publicada na transação de cada cotação |\n| Credencial do `dynaprice_app` | SCRAM-SHA-256; URL lida de arquivo de segredo (`DYNAPRICE_DB_URL_FILE`), injetado pela implantação |\n| Rotação da chave mestra | Envelope com `kid`; chaves antigas aceitas só para decifrar; `cli rotacionar-chave` recifra em lote |\n| Upload de planilha | Até 10 MB e 50 mil linhas; só `.xlsx`/`.csv`; recusa `vbaProject.bin` e células com fórmula; limite de 100 MB descomprimidos |\n| Planilha como plano B | Decisão do administrador; vira nova versão de `EXTRACAO_RAW` com `origem = planilha`, e `hash_conteudo` evita duplicar |\n| Refresh (janela de tolerância) | 10 s: reapresentar o token anterior responde 409 sem revogar; depois disso revoga a família |\n"
+    }
+  ]
+}

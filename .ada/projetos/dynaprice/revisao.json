@@ -1,0 +1,81 @@
+{
+  "secoes": {
+    "1. Objetivo": {
+      "estado": "aprovada",
+      "comentarios": [],
+      "hash": "964de87f440e",
+      "em": "2026-11-09T16:04:23-0300",
+      "por": "o humano (página)"
+    },
+    "2. Escopo e fora do escopo": {
+      "estado": "aprovada",
+      "comentarios": [],
+      "hash": "e630e2243b99",
+      "em": "2026-11-09T16:04:30-0300",
+      "por": "o humano (página)"
+    },
+    "3. Arquitetura": {
+      "estado": "aprovada",
+      "comentarios": [],
+      "hash": "12dec41c21ce",
+      "em": "2026-11-09T16:04:37-0300",
+      "por": "o humano (página)"
+    },
+    "4. Fluxos principais": {
+      "estado": "aprovada",
+      "comentarios": [],
+      "hash": "d506a8d67aeb",
+      "em": "2026-11-09T16:04:40-0300",
+      "por": "o humano (página)"
+    },
+    "5. Dados": {
+      "estado": "aprovada",
+      "comentarios": [],
+      "hash": "847115928e04",
+      "em": "2026-11-09T16:04:43-0300",
+      "por": "o humano (página)"
+    },
+    "6. Integrações e ambiente": {
+      "estado": "aprovada",
+      "comentarios": [],
+      "hash": "afe07c49b223",
+      "em": "2026-11-09T16:04:46-0300",
+      "por": "o humano (página)"
+    },
+    "7. Requisitos não funcionais": {
+      "estado": "aprovada",
+      "comentarios": [],
+      "hash": "7a270cf4c31e",
+      "em": "2026-11-09T16:04:49-0300",
+      "por": "o humano (página)"
+    },
+    "8. Riscos": {
+      "estado": "aprovada",
+      "comentarios": [],
+      "hash": "0a0a34dd45d8",
+      "em": "2026-11-09T16:04:52-0300",
+      "por": "o humano (página)"
+    },
+    "9. Lacunas do desenho": {
+      "estado": "aprovada",
+      "comentarios": [],
+      "hash": "318359ad194c",
+      "em": "2026-11-09T16:04:55-0300",
+      "por": "o humano (página)"
+    },
+    "10. Decisões em aberto": {
+      "estado": "aprovada",
+      "comentarios": [],
+      "hash": "bc19e869a55f",
+      "em": "2026-11-09T16:04:59-0300",
+      "por": "o humano (página)"
+    },
+    "11. Marcos": {
+      "estado": "aprovada",
+      "comentarios": [],
+      "hash": "6032f030863c",
+      "em": "2026-11-09T16:05:01-0300",
+      "por": "o humano (página)"
+    }
+  }
+}

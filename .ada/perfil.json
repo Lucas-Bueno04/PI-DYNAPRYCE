@@ -1,0 +1,90 @@
+{
+  "versao": 1,
+  "nome": "dynaprice-local",
+  "descricao": "Desenvolvimento local do DynaPrice; CI no GitHub Actions e piloto na rede do escritório (D9), estes dois ainda sem destino configurado",
+  "humano": "Lucas",
+  "idioma": "pt-BR",
+  "regras": [
+    "docs/engenharia/principios.md"
+  ],
+  "documentacao": {
+    "raiz": "docs/"
+  },
+  "alvos": {
+    "backend": {
+      "testar": "cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run lint-imports && uv run pytest -q",
+      "caminhos": [
+        "backend/"
+      ],
+      "nos": [
+        "local"
+      ]
+    },
+    "backend-arquitetura": {
+      "testar": "cd backend && uv run lint-imports && uv run pytest -q tests/arquitetura",
+      "caminhos": [
+        "backend/pyproject.toml",
+        "backend/src/",
+        "backend/tests/arquitetura/"
+      ],
+      "nos": [
+        "local"
+      ]
+    },
+    "isolamento": {
+      "testar": "cd backend && uv run pytest -q tests/integracao/test_isolamento.py",
+      "caminhos": [
+        "backend/src/dynaprice/adaptadores/saida/postgres/",
+        "backend/tests/integracao/"
+      ],
+      "nos": [
+        "local"
+      ]
+    },
+    "contrato": {
+      "testar": "cd backend && uv run pytest -q tests/contrato",
+      "caminhos": [
+        "backend/src/dynaprice/aplicacao/portas/",
+        "backend/tests/contrato/"
+      ],
+      "nos": [
+        "local"
+      ]
+    },
+    "frontend": {
+      "testar": "cd frontend && npm ci && npm run typecheck && npm run lint && npm test",
+      "caminhos": [
+        "frontend/"
+      ],
+      "nos": [
+        "local"
+      ]
+    },
+    "compose": {
+      "testar": "docker compose -f deploy/compose/compose.yaml config -q",
+      "caminhos": [
+        "deploy/compose/"
+      ],
+      "nos": [
+        "local"
+      ]
+    }
+  },
+  "mapa": ".ada/perfil/mapa.json",
+  "commit": {
+    "automatico": false,
+    "publicacao": "humano"
+  },
+  "segredos": {
+    "nunca_ler": [
+      ".env",
+      "dados/"
+    ]
+  },
+  "procedimentos": {
+    "publicar": {
+      "arquivo": "docs/procedimentos/publicar.md",
+      "descricao": "Publicação no piloto, feita pelo responsável"
+    }
+  }
+}

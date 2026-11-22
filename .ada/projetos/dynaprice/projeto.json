@@ -1,0 +1,6 @@
+{
+  "name": "DynaPrice",
+  "idea": "Plataforma de precificação dinâmica orientada a esforço para prestadores de serviços profissionais recorrentes (artigo Artigo_Precificacao_Dinamica_Lucas_Bueno_v2.pdf). Estima horas-padrão por equações de tempo TDABC (Huber), com coeficientes congelados na versão de política; Ridge log-log só como controle. Preço por contrato: P = κ·max(π_regime, τ·ΣH_pad das empresas) (ADR-003); sem histórico, piso do regime; histórico parcial, credibilidade (ADR-004). Recalibração mensal em malha fechada, com transição limitada, data de reajuste por contrato e decisão humana. Cliente-servidor: SPA React + TypeScript; backend 100% Python em Clean Architecture (monólito modular: api FastAPI, worker com fila em Postgres, cli); PostgreSQL 16+ com RLS; JWT ES256 emitido pelo backend (ADR-001, ADR-002). Independente de infraestrutura; Proxmox é só um alvo de implantação futuro (F4). Fontes do piloto: Domínio (ODBC), Omie (API), planilhas.",
+  "createdAt": 1794247818864,
+  "updatedAt": 1794363993059
+}

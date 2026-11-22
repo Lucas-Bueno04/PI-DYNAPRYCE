@@ -1,0 +1,45 @@
+{
+  "title": "Ambientes do DynaPrice",
+  "summary": "Local, CI e piloto; CI e piloto ainda sem destino configurado.",
+  "views": [
+    {
+      "type": "graph",
+      "label": "Ambiente",
+      "direction": "LR",
+      "nodes": [
+        {
+          "id": "local",
+          "label": "Máquina local (desenvolvimento)",
+          "kind": "service",
+          "info": "Linux; uv 0.13.7 com CPython 3.14.10 gerenciado; backend/ testado aqui. Dados reais só em dados/ (ignorado pelo git), pseudonimizados (D8)."
+        },
+        {
+          "id": "ci",
+          "label": "CI (GitHub Actions + GHCR)",
+          "kind": "external",
+          "info": "Decisão CI. A confirmar: o remoto no GitHub ainda precisa ser criado pelo responsável."
+        },
+        {
+          "id": "piloto",
+          "label": "Piloto (rede do escritório)",
+          "kind": "service",
+          "info": "Decisão D9. A confirmar: host, acesso e destino de backup, com a TI do escritório."
+        }
+      ],
+      "edges": [
+        {
+          "from": "local",
+          "to": "ci",
+          "label": "push (responsável)",
+          "style": "dashed"
+        },
+        {
+          "from": "ci",
+          "to": "piloto",
+          "label": "imagem (responsável)",
+          "style": "dashed"
+        }
+      ]
+    }
+  ]
+}

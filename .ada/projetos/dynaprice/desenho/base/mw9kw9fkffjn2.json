@@ -1,0 +1,2057 @@
+{
+  "id": "mw9kw9fkffjn2",
+  "createdAt": 1794247937984,
+  "updatedAt": 1794250917172,
+  "request": "(pedido feito no terminal)",
+  "title": "Arquitetura e componentes do DynaPrice",
+  "summary": "v5: revisão 2 — contrato como unidade de preço (ADR-003), vínculos, data de reajuste, inflação, parâmetros congelados, arredondamento, conciliação, segredos de conectores cifrados, multi-inquilino no login, recuperação de acesso, relógio injetável, carteira sintética. ADR-004: sem dados, preço provisório = piso do regime; kNN fora do MVP.",
+  "views": [
+    {
+      "type": "markdown",
+      "label": "Revisão arquitetural",
+      "content": "# Revisão arquitetural do DynaPrice\n\n> **Atualização:** a ADR-001 (Clean Architecture, cliente-servidor) e a ADR-002 (JWT emitido pelo backend) substituem os itens desta revisão sobre interface server-rendered e provedor OIDC externo. O PostgreSQL foi confirmado após a avaliação do MySQL (sem RLS, sem DDL transacional, sem índice parcial).\n\n**Premissa:** produto independente e autocontido. Proxmox/intranet é só um destino de implantação futuro (perfil A), e não uma dependência do desenho.\n\n## Veredito\n\nA matemática do artigo é o produto, e ela está bem especificada. A versão 1 dos diagramas copiava a **arquitetura de referência inteira** (seção 7) como se fosse o MVP. Para uma carteira da ordem de 10³ clientes, com recalibração mensal e meia dúzia de usuários, isso é overengineering. Além disso, havia **4 erros de modelagem**, que importam mais que o excesso.\n\n## Erros corrigidos (afetam a correção, não só a complexidade)\n\n| # | Problema na v1 | Correção |\n|---|---|---|\n| E1 | O Ridge aparecia alimentando a política. No artigo, o preço usa **H_pad das equações de tempo**; o Ridge só valida, gera os pesos de Gower e aponta candidatos a κ. | Ridge virou componente de **controle**, fora do caminho do preço. |\n| E2 | A recalibração mensal reestimava coeficientes, o que move o H_pad de toda a carteira todo mês. Isso contraria A7 e a lógica de preço-teto da seção 6.10 (ganhos de eficiência ficam no ciclo e são repassados na revisão). O Algoritmo 4 ainda usa o R² do Ridge como portão de um modelo que nem define o preço. | **Coeficientes β pertencem à versão de política.** Mensal: só recalcula H_pad com os β publicados. Anual: reestima β e τ e gera um **rascunho** de política, publicado por aprovação. O portão de aceite passa a valer para as equações de tempo. |\n| E3 | A fórmula do preço estava em três lugares (cotação, recalibração, simulador). | Núcleo puro `politica.preco_alvo` / `transicao` / `inferencia` / `gatilho` / `tarifa`, sem I/O, usado por todos. Base dos testes de propriedade (Prop. 3, 7 e 8). |\n| E4 | Faltava a porta mais importante: **conector de origem**. As 6 portas do artigo são de infraestrutura; o que de fato varia entre clientes e setores são os sistemas de origem (Domínio, Omie, planilha...). | Porta `Conector de origem` com formato canônico; um pacote vertical = conector + mapeamento + configuração. |\n\n## Overengineering removido (adiável sem retrabalho)\n\n| v1 | v2 | Por quê |\n|---|---|---|\n| NATS JetStream + outbox + retransmissor + DLQ + consumidor idempotente | Tabela `core.job` no Postgres (`FOR UPDATE SKIP LOCKED`), com idempotência por chave natural `(tenant, tipo, competência)` | Um job por mês por tenant. Uma transação Postgres já dá \"efeito exatamente uma vez\" sem barramento. |\n| Objetos S3 com camadas bruta/limpa/analítica | Esquemas `raw` (jsonb imutável) e `core` no Postgres | 500 clientes × 12 meses × 30 colunas ≈ 1,4 MB. Reprocessar continua possível. |\n| 3 serviços (API, integração, motores) + retransmissor | **1 código, 1 imagem, 3 entradas** (web, worker, cli) | Monólito modular de verdade. Os motores levam milissegundos (seção 5.16). |\n| Cofre com Shamir, segredos por identidade de máquina | Variáveis de ambiente / arquivo de segredo injetado pela implantação | É responsabilidade da plataforma de implantação, não do produto. |\n| Keycloak como componente | JWT emitido pelo próprio backend (ADR-002); federação OIDC opcional em F3 | Um componente a menos para operar; a porta de identidade mantém a federação possível. |\n| Barramento para recarregar a política | `LISTEN/NOTIFY` do Postgres | Mesmo efeito, zero componentes. |\n| GAM, florestas e boosting em produção | Ficam no `cli` de laboratório (comparação offline) | O artigo mostra ganho < 0,01; em produção só Huber + Ridge. |\n| Segmentação aprendida (k-medoides) desde o início | Declarada (regime tributário) no MVP; aprendida em F3 | Contabilidade tem segmentação canônica. |\n| pgvector / índice aproximado | kNN exato em memória | n ≤ 10⁴ → fração de ms. |\n| Estados GERADA → VALIDADA → PENDENTE | Validação na criação; estados persistidos: PENDENTE, APROVADA, REJEITADA, EXPIRADA, EXPORTADA | GERADA/VALIDADA eram transitórios. |\n| Visão 3D dos componentes | Removida | Duplicava a 2D. |\n| Implantação acoplada ao Proxmox (zonas Z0–Z4) | Implantação agnóstica (contêineres: web, worker, postgres) + nota para o perfil Proxmox | Atende ao RNF09 de verdade. |\n\n## O que fica desde o dia 1 (barato agora, caro depois)\n\n- `tenant_id` em toda tabela + **RLS forçada** + tenant no escopo da transação.\n- **Política como dado versionado e imutável** (agora incluindo os β).\n- **Decisão humana** em toda mudança de preço; decomposição em toda resposta.\n- **Auditoria encadeada por hash** (um trigger, uma coluna). A âncora externa fica para F3.\n- Testes de propriedade do núcleo contra as proposições do artigo.\n\n## Stack recomendada (MVP)\n\nBackend: Python 3.12 · FastAPI (API JSON) · SQLAlchemy 2 Core + psycopg 3 · Frontend: React + TypeScript (Vite) · numpy, pandas, scikit-learn, statsmodels (Huber) · PostgreSQL 16 · pytest + hypothesis · contêiner OCI único.\n\n## Roteiro\n\n| Fase | Entrega | Portão |\n|---|---|---|\n| F0 Laboratório | `cli` reproduz o artigo com dados reais: diagnóstico, equações de tempo, Ridge, τ, simulação | R² e β coerentes com a seção 9; gestor reconhece o diagnóstico |\n| F1 Núcleo + recalibração | Núcleo puro testado, Postgres + RLS, conectores (planilha → Domínio → Omie), política versionada, recomendações, exportação por arquivo, UI mínima | Exemplo da Tabela 7 = 614,27 / 3 ciclos; teste de isolamento entre tenants |\n| F2 Cotação | Inferência por nível, Gower/kNN, credibilidade; **validação por ocultação** (lacuna do artigo, seção 10.5) | EPAM da inferência medido; p95 < 300 ms |\n| F3 Produto multi-inquilino | Consultor, segmentação aprendida, âncora de auditoria, exportação por API, pacotes verticais | Segundo inquilino real |\n| F4 Implantação | Perfil Proxmox (zonas, firewall, backup 3-2-1) como mais um alvo | Ensaio de restauração dentro do RTO |\n\n## Riscos que continuam abertos (do artigo)\n\n- Horas registradas omitem atendimento fora do sistema → teto de R² de cerca de 0,77; o Lucro Real fica subestimado → tempo fixo por segmento (β0,m,r) já previsto nas equações.\n- Simulação estática (não modela cancelamentos) → medir aceitação na transição.\n"
+    },
+    {
+      "type": "markdown",
+      "label": "Revisão 2 (lacunas)",
+      "content": "# Revisão 2 — lacunas encontradas com a stack fechada\n\nA primeira revisão cortou excessos. Esta procura o que **falta** para o sistema funcionar de verdade num escritório. Prioridade: **B** = bloqueia F1 (o preço sai errado ou inseguro sem isso) · **F1/F2/F3** = fase em que entra.\n\n## Domínio (o que o artigo deixa implícito)\n\n| # | Lacuna | Por que importa | Decisão | Prior. |\n|---|---|---|---|---|\n| D1 | **A unidade de preço é o contrato, não a empresa.** O artigo liga sistemas pelo \"código do contrato\" e achou 1/3 das empresas sem honorário próprio (filiais, folhas cobradas em outro CNPJ). | Sem isso, H_pad de filial fica sem preço e o pagante fica subprecificado. | Separar `Contrato` (precificado, tem segmento, preço vigente, data de reajuste) de `Empresa` (gera direcionadores). H_pad do contrato = Σ H_pad das empresas; piso aplicado **uma vez por contrato**, segmento = o da empresa principal. ADR-003. | B |\n| D2 | **Vínculo entre sistemas** (empresa do Domínio ↔ contrato do Omie) é manual em parte. | O artigo descartou 10% dos clientes por vínculo ausente. | Tabela de vínculos + fila \"pendências de vínculo\" na UI; nenhuma empresa sem vínculo entra no cálculo silenciosamente. | B |\n| D3 | **Data de reajuste por contrato.** O artigo aplica a transição \"na data de revisão contratual\". | Aplicar todos no mesmo mês concentra reclamações e não respeita contratos. | `Contrato.mes_reajuste`; a recalibração mensal só gera recomendação com efeito para contratos cujo reajuste cai na janela; os demais ficam só monitorados. | B |\n| D4 | **Índice de inflação** (π_t da transição) não tem fonte. | A Prop. 8 depende dele. | Tabela `indice_inflacao` (entrada manual auditada no MVP; adaptador BCB/IPCA em F3). | B |\n| D5 | **Parâmetros que precisam ser congelados na versão de política**: índices sazonais (dessazonalização do nível 1), s²/v² da credibilidade, k, k_min, d_max, pesos de Gower, π0, regra de arredondamento. | Sem isso a cotação não é reproduzível e o valor muda sem nova versão. | Tudo dentro de `PoliticaVersao.parametros`, imutável. | B |\n| D6 | **Reprodutibilidade de cada preço.** | Contestação do cliente e auditoria (A5, RNF06). | `PrecoAlvo` grava as entradas usadas (médias de direcionadores, versão, vizinhos) e o cálculo pode ser refeito por `cli recalcular --id`. | F1 |\n| D7 | **Arredondamento monetário** indefinido. | Diferença de centavos entre a tela, a exportação e o financeiro. | `Decimal` com `ROUND_HALF_UP` a 2 casas num único ponto (`dominio/precificacao/dinheiro`); arredondamento comercial (ex.: a 5,00) opcional na política. | B |\n| D8 | **Conciliação.** Nada confere se o financeiro passou a cobrar o valor aprovado. | Fecha a malha de verdade: hoje a \"realimentação\" é só suposta. | Caso de uso `ConciliarCobranca` após cada importação: aprovado × cobrado → alerta de divergência. | F1 |\n| D9 | **Competência fechada.** | Mês importado cedo tem lançamentos faltando. | Regra por inquilino: competência só fecha N dias após o fim do mês; reextração cria nova versão em `raw` e o analítico usa a última. | F1 |\n\n## Segurança\n\n| # | Lacuna | Decisão | Prior. |\n|---|---|---|---|\n| S1 | **Credenciais dos conectores por inquilino** (ODBC do Domínio, app_key/secret do Omie) não têm lugar. | Porta `CifradorDeSegredos`: cifra de envelope AES-256-GCM com chave mestra vinda do ambiente; guardadas cifradas em `conector_config`; nunca retornadas pela API. | B |\n| S2 | **Usuário em mais de um inquilino** (consultor, ou escritório com 2 CNPJs): o JWT tem um `tid` só. | Login devolve a lista de inquilinos; `POST /auth/inquilino` emite novo par de tokens para o escolhido. Tabelas de `auth` ficam fora da RLS por inquilino e só são acessadas pelos casos de uso de autenticação. | F1 |\n| S3 | **Recuperação de acesso**: troca de senha, perda do celular do MFA. | Redefinição por link de uso único (hash, 30 min) + 10 códigos de recuperação do MFA (hash Argon2id); toda recuperação é auditada e revoga as sessões. | F1 |\n| S4 | **Papéis do banco.** | `dynaprice_migrador` (dono, DDL) separado de `dynaprice_app` (sem `BYPASSRLS`, sem DDL). O worker fixa o tenant por job, como a API. | B |\n| S5 | **Matriz de autorização** não escrita. | Tabela papel × caso de uso no código (`aplicacao/autorizacao.py`) + teste que percorre todas as rotas e falha se alguma não declarar papel. | F1 |\n| S6 | **Cadeia de suprimentos.** | Lockfiles (`uv.lock`, `package-lock.json`), Renovate, SBOM (syft), varredura de imagem (trivy), pip-audit/npm audit no CI. | F1 |\n| S7 | **Logs com dado pessoal.** | Lista de campos proibidos no structlog (e-mail, CPF, token, senha) + teste. | F1 |\n| S8 | **CSP da SPA.** | `default-src 'self'`, sem inline; o proxy aplica. | F1 |\n\n## Engenharia\n\n| # | Lacuna | Decisão | Prior. |\n|---|---|---|---|\n| G1 | **Não há dados públicos** para testar e demonstrar (os do artigo são protegidos). | Gerador de **carteira sintética** calibrado nas estatísticas da seção 9 (elasticidades, Gini, β da Tabela 4, regra implícita 213 + 32H). É o insumo dos testes, do CI e das demos. | B |\n| G2 | **Tempo no domínio** (competência, expiração, datas de reajuste) dificulta testes. | Porta `Relogio`; testes com relógio fixo. | B |\n| G3 | **Determinismo numérico.** | Sementes fixas, `OMP_NUM_THREADS=1` na estimação, versões de bibliotecas gravadas no `RelatorioEstimacao`. | F1 |\n| G4 | **Contrato API ↔ SPA.** | CI gera o OpenAPI, regenera os tipos TS e falha se houver diferença não commitada. | F1 |\n| G5 | **Jobs longos e acompanhamento.** | Extração fora da transação (grava em `raw`, depois processa); `GET /jobs/{id}` com progresso para a SPA; estado `falhou` com erro e nova tentativa manual. | F1 |\n| G6 | **Simplificação:** APScheduler é desnecessário. | O próprio laço do worker enfileira os jobs agendados com `INSERT … ON CONFLICT DO NOTHING`. Uma dependência a menos. | F1 |\n| G7 | **Correlação.** | `request_id` gerado na API e propagado ao job e aos logs. | F1 |\n| G8 | **Monorepo.** | `backend/`, `frontend/`, `docs/adr/`, `deploy/compose/`; CI em dois estágios + um job de contrato. | F1 |\n\n## O que **não** precisa mudar\n\nClean Architecture, monólito modular, PostgreSQL + RLS, JWT ES256 com rotação de refresh, política como dado, decisão humana, Ridge fora do caminho do preço. Nenhuma dessas lacunas pede componente novo de infraestrutura: são entidades, casos de uso, duas portas pequenas (`CifradorDeSegredos`, `Relogio`) e disciplina de CI.\n"
+    },
+    {
+      "type": "markdown",
+      "label": "ADR-001 Arquitetura",
+      "content": "# ADR-001 — Cliente-servidor, backend em Clean Architecture, PostgreSQL\n\n**Estado:** proposta (aguarda aprovação) · **Data:** 2026-11-09\n\n## Contexto\nO artigo exige independência de infraestrutura (RNF09), isolamento multi-inquilino imposto pelo banco (RNF03), preço decomponível e auditável (RNF07, RNF06). A carteira tem cerca de 10³ clientes por inquilino, a recalibração é mensal e são poucos usuários.\n\n## Decisão\n1. **Cliente-servidor:**\n   - **Cliente:** SPA em React + TypeScript, que só apresenta dados e não contém regra de preço.\n   - **Servidor:** API JSON versionada (`/api/v1`), cujo contrato é o **OpenAPI** gerado pelo backend. Os tipos TypeScript do cliente são gerados desse contrato.\n2. **Backend em Clean Architecture** com 4 anéis (Entidades → Casos de uso → Adaptadores → Frameworks e drivers); a dependência aponta sempre para dentro. As portas do artigo são as interfaces do anel 2.\n3. **Monólito modular:** um pacote e uma imagem, com três entradas (`api`, `worker`, `cli`).\n4. **PostgreSQL** como único estado: RLS forçada, DDL transacional, índices parciais, `LISTEN/NOTIFY`, fila `core.job` com `SKIP LOCKED`, `JSONB` e `pgcrypto`.\n5. **Mesma origem:** o proxy serve a SPA em `/` e encaminha `/api` ao backend. Assim não há CORS, e o cookie de renovação pode ser `SameSite=Strict`.\n6. **Cerimônia mínima:** sem presenter nem interfaces de entrada/saída por caso de uso. Os casos de uso usam dataclasses do domínio; Pydantic só aparece na borda HTTP.\n7. **Exceção declarada:** `dominio/estimacao` pode importar numpy, pandas, scikit-learn e statsmodels. A regra é verificada no CI por import-linter.\n8. **Autorização é regra de negócio:** quem pode publicar política ou decidir recomendação é verificado nos casos de uso (anel 2), a partir do `Principal` extraído do token.\n\n## Estrutura\n```\nbackend/dynaprice/\n  dominio/{modelos,precificacao,estimacao}/          # anel 1\n  aplicacao/portas/  aplicacao/*.py                  # anel 2 (inclui autenticar.py, renovar_sessao.py)\n  adaptadores/entrada/{api,worker,cli}/              # anel 3\n  adaptadores/saida/{postgres,conectores/{dominio,omie,planilha},exportadores,seguranca}/\n  principal.py                                       # anel 4: composição e partida\nfrontend/src/\n  app/ (providers, rotas, guarda por papel)\n  features/{auth,diagnostico,laboratorio,cotacao,recomendacoes,politicas,admin}/\n  shared/{api (gerado do OpenAPI),ui,graficos,lib}/\n```\n\n## Alternativas consideradas\n- **MySQL:** rejeitado. Sem RLS, sem DDL transacional e sem índice parcial.\n- **Interface server-rendered (HTMX):** substituída pela SPA React, por decisão de produto (cliente-servidor explícito).\n- **Microsserviços:** rejeitados neste porte.\n\n## Consequências\n- (+) A regra de preço tem uma implementação só, no backend, testável sem banco.\n- (+) O contrato OpenAPI tipa o frontend: mudança incompatível na API quebra o build do cliente, e não a produção.\n- (−) Dois projetos para construir e publicar (`backend/` e `frontend/`) e uma esteira de CI com dois estágios.\n"
+    },
+    {
+      "type": "markdown",
+      "label": "ADR-002 Autenticação JWT",
+      "content": "# ADR-002 — Autenticação por JWT emitido pelo backend\n\n**Estado:** proposta · **Data:** 2026-11-09\n\n## Decisão\n| Item | Definição |\n|---|---|\n| Emissor | O próprio backend (caso de uso `Autenticar`, porta `EmissorDeTokens`) |\n| Token de acesso | **JWT ES256**, 15 min. Claims: `iss`, `aud`, `sub`, `tid` (inquilino), `roles` (analisar, aprovar, administrar), `iat`, `exp`, `jti`. Cabeçalho `kid` para rotação de chave |\n| Onde fica no cliente | **Só na memória** da SPA (nunca em `localStorage`/`sessionStorage`); enviado como `Authorization: Bearer` |\n| Token de renovação | Opaco, aleatório de 256 bits, guardado no banco **só como hash** (SHA-256), com família, rotação a cada uso e **detecção de reuso** (reuso revoga a família inteira). Validade de 12 h por inatividade e 7 dias absolutos |\n| Transporte do refresh | Cookie `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth`. A rota `/auth/renovar` também confere o cabeçalho `Origin` |\n| Senha | Argon2id |\n| MFA | TOTP (RF11), obrigatório para os papéis `aprovar` e `administrar` |\n| Chaves | Par ES256 injetado por segredo da implantação. Chaves públicas em `/api/v1/auth/jwks.json`. Rotação: nova chave assina, a antiga só valida até expirar |\n| Validação | Middleware no adaptador de entrada: assinatura, `iss`, `aud`, `exp` (tolerância de 30 s) → `Principal(usuario, tenant, papeis)` |\n| Autorização | Nos casos de uso (anel 2) |\n| Isolamento | O `tid` do token vira `set_config('app.tenant_id', …, true)` em cada transação, e a RLS do PostgreSQL faz o resto |\n| Sair | Revoga a família de refresh; o token de acesso expira em até 15 min |\n| Proteção contra força bruta | Limite por IP e por conta, com atraso progressivo, auditado |\n\n## Alternativas\n- **Provedor OIDC externo (Keycloak etc.):** adiado para F3, como **federação**: o backend aceita login federado e continua emitindo o próprio JWT. A porta `Identidade` já permite.\n- **Sessão em cookie com estado no servidor:** mais simples, mas o pedido foi JWT, e o JWT permite clientes futuros (integrações, mobile) sem mudança.\n- **HS256:** rejeitado. A chave simétrica teria de ser compartilhada com qualquer verificador.\n\n## Consequências\n- (+) Sem dependência de serviço externo para logar.\n- (−) O backend passa a ser responsável por senha, MFA, bloqueio e rotação de chave, e esse código precisa de revisão de segurança dedicada.\n\n## Complementos (revisão 2)\n- **Vários inquilinos por usuário:** o login devolve os inquilinos disponíveis; `POST /auth/inquilino` emite um par de tokens para o `tid` escolhido.\n- **Recuperação:** link de redefinição de uso único (hash, 30 min); 10 códigos de recuperação do MFA guardados em Argon2id; toda recuperação revoga as sessões e é auditada.\n- **Banco:** as tabelas de `auth` ficam fora da RLS por inquilino e só os casos de uso de autenticação as acessam.\n"
+    },
+    {
+      "type": "markdown",
+      "label": "ADR-003 Contrato como unidade",
+      "content": "# ADR-003 — O contrato é a unidade de precificação\n\n**Estado:** aceita quanto à cobrança — o escritório confirmou em 2026-11-09 que cobra **por contrato** (um piso por contrato, independentemente do número de CNPJs) · regra de segmento da empresa principal ainda a validar\n\n## Contexto\nO artigo modela \"cliente\" como uma linha com horas, direcionadores e honorário. Na prática, o honorário é cobrado por **contrato**, e um contrato pode cobrir várias empresas (matriz, filiais, folha separada, holding). No caso estudado, cerca de 1/3 das empresas ativas não tinha honorário próprio (seção 9.1), e o artigo as excluiu da modelagem. Num produto, excluir não é opção: essas empresas geram esforço que alguém paga.\n\n## Decisão\n- `Empresa`: unidade **operacional**. Tem direcionadores, horas e perfil, e pertence a exatamente um `Contrato` em cada competência.\n- `Contrato`: unidade **comercial**. Tem segmento, preço vigente, mês de reajuste, κ e estado provisório.\n- H_pad(contrato) = Σ H_pad(empresas), com as equações de tempo aplicadas **por empresa**, porque o tempo fixo β0 existe para cada CNPJ escriturado.\n- **Piso aplicado uma vez por contrato** (confirmado pelo escritório).\n- Segmento do contrato = segmento da empresa principal (marcada no vínculo). Ainda a validar com o escritório.\n- O nível de informação é o do contrato: o menor nível entre as empresas, com o mínimo de meses entre elas.\n- A estimação (Huber/Ridge) continua **por empresa**. A tarifa (τ̂ = ΣF/ΣH_pad) e a política são **por contrato**.\n\n## Consequências\n- (+) Nenhum esforço fica sem preço; a \"pendência de vínculo\" vira um fluxo visível.\n- (+) A matemática do artigo não muda: só a agregação antes da política.\n- (−) É preciso um mapa de vínculos mantido pelo escritório (RF03), com histórico por competência.\n"
+    },
+    {
+      "type": "markdown",
+      "label": "ADR-004 Piso do regime sem dados",
+      "content": "# ADR-004 — Sem dados operacionais, o preço provisório é o piso do regime tributário\n\n**Estado:** aceita — regra definida pelo escritório em 2026-11-09\n\n## Contexto\nO artigo (seções 5.15 e 6.9, Algoritmo 2) precifica um contrato sem histórico pela média dos preços-alvo de vizinhos semelhantes (Gower + kNN). Quando não há informação nenhuma, usa a média dos preços praticados (π0). O escritório adota outra regra: pisos por regime tributário e, sem dados, o piso do regime.\n\n## Decisão\n1. **Segmentação principal declarada = regime tributário** (MEI, Simples Nacional, Lucro Presumido, Lucro Real). Os pisos π_r são definidos na análise de cada empresa/carteira e publicados na versão de política.\n2. **Regime obrigatório** em todo contrato e cotação (é sempre conhecido pelo CNPJ). O \"nível 0 sem nenhuma informação\" deixa de existir.\n3. **Cascata de preço:**\n\n| Situação | Preço | Natureza |\n|---|---|---|\n| 12 meses de direcionadores (ℓ = 2) | κ·max(π_r, τ·H_pad) | definitivo, segue a transição |\n| 1 a 11 meses (ℓ = 1 com histórico) | κ·[Z·max(π_r, τ·H_pad,pr) + (1 − Z)·π_r], Z = m/(m + s²/v²) | provisório |\n| Sem histórico (cotação de cliente novo) | π_r do regime | provisório |\n\n4. **Revisão integral** do provisório (sem o teto θ) quando o contrato chega a ℓ = 2, como na seção 6.7.\n5. **Inferência por vizinhos (Gower/kNN)** fica fora do MVP como opção da política (`sem_historico: \"piso_regime\" | \"vizinhos\"`), avaliável em F2/F3 pelo protocolo de ocultação.\n\n## Consequências\n- (+) Regra simples de explicar ao cliente e sem dependência de vizinhança: sai um componente do caminho crítico da cotação.\n- (−) **Risco de subprecificação** no período provisório: o piso é o menor preço admissível, e clientes novos de alto esforço pagam o piso até ter histórico. Mitigação: a credibilidade passa a pesar o esforço próprio já no 1º mês de dados; revisão integral em ℓ = 2; relatório mensal de \"provisórios abaixo do esforço medido\".\n- (−) **Incentivo** (seção 6.10): o ganho máximo de um cliente que demora a fornecer dados é limitado pelo número de meses até os dados chegarem. Como os direcionadores vêm da própria execução do serviço, isso tende a ser 1 a 2 meses.\n"
+    },
+    {
+      "type": "graph",
+      "label": "Contexto (C4-1)",
+      "direction": "LR",
+      "nodes": [
+        {
+          "id": "gestor",
+          "label": "Gestor do prestador",
+          "kind": "actor",
+          "info": "Publica versões de política e decide recomendações (aprovar, ajustar κ com justificativa, rejeitar). Papel 'aprovar'.",
+          "x": 150,
+          "y": 130,
+          "w": 96,
+          "h": 96,
+          "color": "#7DD3FC",
+          "shape": "circle",
+          "layer": 0
+        },
+        {
+          "id": "analista",
+          "label": "Analista de precificação",
+          "kind": "actor",
+          "info": "Diagnóstico, laboratório de políticas, cotação. Papel 'analisar'.",
+          "x": 150,
+          "y": 300,
+          "w": 96,
+          "h": 96,
+          "color": "#7DD3FC",
+          "shape": "circle",
+          "layer": 0
+        },
+        {
+          "id": "admin",
+          "label": "Administrador",
+          "kind": "actor",
+          "info": "Usuários, papéis, segmentação, conectores. Papel 'administrar'. (Consultor multi-inquilino fica para F3.)",
+          "x": 150,
+          "y": 650,
+          "w": 96,
+          "h": 96,
+          "color": "#7DD3FC",
+          "shape": "circle",
+          "layer": 0
+        },
+        {
+          "id": "dynaprice",
+          "label": "DynaPrice",
+          "kind": "service",
+          "info": "SPA React TS (cliente) + API em Clean Architecture (servidor) + PostgreSQL. P = κ·max(π_r, τ·H_pad). Autenticação própria por JWT.",
+          "x": 590,
+          "y": 730,
+          "w": 170,
+          "h": 66,
+          "color": "#3CF0A8",
+          "shape": "rect",
+          "layer": 2
+        },
+        {
+          "id": "src_esc",
+          "label": "Escrituração contábil/fiscal",
+          "kind": "external",
+          "info": "Ex.: Domínio (ODBC). Sessões de trabalho (H), notas por tipo, lançamentos manuais/automáticos, folha. Somente leitura.",
+          "x": 150,
+          "y": 810,
+          "w": 170,
+          "h": 66,
+          "color": "#94A3B8",
+          "shape": "parallelogram",
+          "layer": 4
+        },
+        {
+          "id": "src_fin",
+          "label": "Sistema financeiro",
+          "kind": "external",
+          "info": "Ex.: Omie (API). Honorários praticados F_i. Somente leitura, via conector.",
+          "x": 1030,
+          "y": 800,
+          "w": 170,
+          "h": 66,
+          "color": "#94A3B8",
+          "shape": "parallelogram",
+          "layer": 4
+        },
+        {
+          "id": "src_cad",
+          "label": "Cadastro / perfil",
+          "kind": "external",
+          "info": "Regime tributário, natureza jurídica, faturamento, empregados, CNAE. Pode vir da escrituração.",
+          "x": 150,
+          "y": 950,
+          "w": 170,
+          "h": 66,
+          "color": "#94A3B8",
+          "shape": "parallelogram",
+          "layer": 4
+        },
+        {
+          "id": "planilha",
+          "label": "Planilhas (CSV/XLSX)",
+          "kind": "external",
+          "info": "Conector universal: carga histórica, setores sem integração e plano B de qualquer conector.",
+          "x": 150,
+          "y": 1100,
+          "w": 170,
+          "h": 66,
+          "color": "#94A3B8",
+          "shape": "parallelogram",
+          "layer": 4
+        },
+        {
+          "id": "idp",
+          "label": "Provedor OIDC (opcional, F3)",
+          "kind": "external",
+          "info": "Federação futura; o backend continuaria emitindo o próprio JWT.",
+          "x": 1030,
+          "y": 660,
+          "w": 170,
+          "h": 66,
+          "color": "#94A3B8",
+          "shape": "parallelogram",
+          "layer": 4
+        }
+      ],
+      "edges": [
+        {
+          "from": "gestor",
+          "to": "dynaprice",
+          "label": "publica política / decide",
+          "style": "solid",
+          "id": "emw9mo46rfhaz5"
+        },
+        {
+          "from": "analista",
+          "to": "dynaprice",
+          "label": "diagnóstico, simulação, cotação",
+          "style": "solid",
+          "id": "emw9mo46rn1i3w"
+        },
+        {
+          "from": "admin",
+          "to": "dynaprice",
+          "label": "configuração",
+          "style": "solid",
+          "id": "emw9mo46rc1vgb"
+        },
+        {
+          "from": "src_esc",
+          "to": "dynaprice",
+          "label": "horas e direcionadores (RO)",
+          "style": "solid",
+          "id": "emw9mo46recw1v"
+        },
+        {
+          "from": "src_fin",
+          "to": "dynaprice",
+          "label": "honorários (RO)",
+          "style": "solid",
+          "id": "emw9mo46r1ulst"
+        },
+        {
+          "from": "src_cad",
+          "to": "dynaprice",
+          "label": "perfil (RO)",
+          "style": "solid",
+          "id": "emw9mo46rvw4pr"
+        },
+        {
+          "from": "planilha",
+          "to": "dynaprice",
+          "label": "upload",
+          "style": "dashed",
+          "id": "emw9mo46rbcpyz"
+        },
+        {
+          "from": "dynaprice",
+          "to": "src_fin",
+          "label": "exporta tabela aprovada (arquivo; API em F3)",
+          "style": "dashed",
+          "id": "emw9mo46rmjres"
+        },
+        {
+          "from": "idp",
+          "to": "dynaprice",
+          "label": "login federado (F3)",
+          "style": "dashed",
+          "id": "emw9mo46r134vs"
+        }
+      ],
+      "layers": [
+        "Usuários",
+        "Borda",
+        "Serviços",
+        "Dados",
+        "Externos"
+      ]
+    },
+    {
+      "type": "graph",
+      "label": "Containers",
+      "direction": "TB",
+      "mode": "2d",
+      "layers": [
+        "Cliente",
+        "Entrada",
+        "Servidor",
+        "Dados",
+        "Externos"
+      ],
+      "nodes": [
+        {
+          "id": "spa",
+          "label": "SPA React + TypeScript",
+          "kind": "client",
+          "info": "Build estático (Vite). Token de acesso só em memória; renovação silenciosa por cookie HttpOnly. Tipos gerados do OpenAPI.",
+          "group": "Cliente",
+          "layer": 0,
+          "x": 200,
+          "y": 150,
+          "w": 170,
+          "h": 66,
+          "color": "#2FE6FF",
+          "shape": "rounded"
+        },
+        {
+          "id": "borda",
+          "label": "Proxy reverso (mesma origem)",
+          "kind": "gateway",
+          "info": "Serve / (arquivos da SPA) e encaminha /api → backend; TLS, limite de taxa, cabeçalhos de segurança (CSP, HSTS). Qualquer proxy (Caddy, Nginx, balanceador).",
+          "group": "Entrada",
+          "layer": 1,
+          "x": 630,
+          "y": 150,
+          "w": 170,
+          "h": 70,
+          "color": "#A78BFA",
+          "shape": "hexagon"
+        },
+        {
+          "id": "api",
+          "label": "backend api",
+          "kind": "service",
+          "info": "FastAPI, JSON em /api/v1, OpenAPI. Emite e valida JWT (ES256). Política vigente em memória, recarregada por LISTEN/NOTIFY. Sem estado: escala horizontal.",
+          "group": "Servidor",
+          "layer": 2,
+          "x": 1070,
+          "y": 760,
+          "w": 170,
+          "h": 66,
+          "color": "#3CF0A8",
+          "shape": "rect"
+        },
+        {
+          "id": "motores",
+          "label": "backend worker",
+          "kind": "service",
+          "info": "Mesma imagem. Laço único: enfileira jobs agendados (ON CONFLICT DO NOTHING) e consome core.job (SKIP LOCKED + LISTEN): extração, conciliação, recalibração mensal, estimação anual.",
+          "group": "Servidor",
+          "layer": 2,
+          "x": 2060,
+          "y": 530,
+          "w": 170,
+          "h": 66,
+          "color": "#3CF0A8",
+          "shape": "rect"
+        },
+        {
+          "id": "cli",
+          "label": "backend cli",
+          "kind": "service",
+          "info": "Mesma imagem. Migrações, carga histórica, laboratório offline, criação do primeiro administrador.",
+          "group": "Servidor",
+          "layer": 2
+        },
+        {
+          "id": "pg",
+          "label": "PostgreSQL 16+",
+          "kind": "data",
+          "info": "Esquemas raw (JSONB imutável), core (RLS forçada), auth (fora da RLS por inquilino), audit (cadeia de hash), job. Papéis: dynaprice_migrador (DDL) e dynaprice_app (sem BYPASSRLS).",
+          "group": "Dados",
+          "layer": 3,
+          "x": 2610,
+          "y": 400,
+          "w": 150,
+          "h": 84,
+          "color": "#FFB547",
+          "shape": "cylinder"
+        },
+        {
+          "id": "bkp",
+          "label": "Backup",
+          "kind": "data",
+          "info": "pg_dump + arquivamento de WAL em destino externo; restauração ensaiada.",
+          "group": "Dados",
+          "layer": 3
+        },
+        {
+          "id": "ext_src",
+          "label": "Sistemas de origem",
+          "kind": "external",
+          "info": "Domínio (ODBC), Omie (API), planilhas.",
+          "group": "Externos",
+          "layer": 4,
+          "x": 2610,
+          "y": 1390,
+          "w": 170,
+          "h": 66,
+          "color": "#94A3B8",
+          "shape": "parallelogram"
+        }
+      ],
+      "edges": [
+        {
+          "from": "spa",
+          "to": "borda",
+          "label": "HTTPS · Bearer JWT · cookie refresh",
+          "style": "solid",
+          "id": "emw9mo46r5c9hj"
+        },
+        {
+          "from": "borda",
+          "to": "api",
+          "label": "HTTP /api/v1",
+          "style": "solid",
+          "id": "emw9mo46rkfjyb"
+        },
+        {
+          "from": "api",
+          "to": "pg",
+          "label": "SQL/TLS · tenant do token no escopo da transação",
+          "style": "solid",
+          "id": "emw9mo46rcez7j"
+        },
+        {
+          "from": "api",
+          "to": "pg",
+          "label": "INSERT job + NOTIFY",
+          "style": "dashed",
+          "id": "emw9mo46rkvp01"
+        },
+        {
+          "from": "motores",
+          "to": "pg",
+          "label": "consome jobs, grava resultados",
+          "style": "solid",
+          "id": "emw9mo46ru093g"
+        },
+        {
+          "from": "motores",
+          "to": "ext_src",
+          "label": "conectores somente leitura",
+          "style": "solid",
+          "id": "emw9mo46rda4x4"
+        },
+        {
+          "from": "cli",
+          "to": "pg",
+          "label": "migrações / carga",
+          "style": "solid",
+          "id": "emw9mo46rfd49w"
+        },
+        {
+          "from": "pg",
+          "to": "bkp",
+          "label": "dump + WAL",
+          "style": "dashed",
+          "id": "emw9mo46rvfspy"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "label": "Clean Architecture (backend)",
+      "direction": "TB",
+      "mode": "2d",
+      "layers": [
+        "Cliente (fora do backend)",
+        "4 · Frameworks e drivers",
+        "3 · Adaptadores de interface",
+        "2 · Casos de uso",
+        "1 · Entidades"
+      ],
+      "nodes": [
+        {
+          "id": "cl_spa",
+          "label": "SPA React TS",
+          "kind": "client",
+          "info": "Fala com o backend apenas pelo contrato OpenAPI + JWT. Ver aba 'Frontend React'.",
+          "group": "Cliente",
+          "layer": 0
+        },
+        {
+          "id": "legenda",
+          "label": "Legenda",
+          "kind": "note",
+          "info": "Contínua = dependência de código, sempre para dentro. Tracejada 'implementa' = adaptador realiza porta do anel 2. Verificado por import-linter.",
+          "group": "Regra de dependência",
+          "layer": 0
+        },
+        {
+          "id": "fw_fastapi",
+          "label": "FastAPI + uvicorn",
+          "kind": "external",
+          "info": "Servidor HTTP JSON e geração do OpenAPI.",
+          "group": "4 · Frameworks e drivers",
+          "layer": 1
+        },
+        {
+          "id": "fw_runtime",
+          "label": "Laço do worker (agenda + fila)",
+          "kind": "external",
+          "info": "Enfileira jobs agendados com INSERT … ON CONFLICT DO NOTHING e consome com SKIP LOCKED + LISTEN. Sem APScheduler.",
+          "group": "4 · Frameworks e drivers",
+          "layer": 1
+        },
+        {
+          "id": "fw_typer",
+          "label": "Typer (CLI)",
+          "kind": "external",
+          "info": "",
+          "group": "4 · Frameworks e drivers",
+          "layer": 1
+        },
+        {
+          "id": "fw_db",
+          "label": "PostgreSQL 16 + psycopg 3",
+          "kind": "data",
+          "info": "RLS, LISTEN/NOTIFY, SKIP LOCKED, pgcrypto.",
+          "group": "4 · Frameworks e drivers",
+          "layer": 1,
+          "shape": "cylinder"
+        },
+        {
+          "id": "fw_odbc",
+          "label": "pyodbc + driver ODBC",
+          "kind": "external",
+          "info": "Banco do Domínio.",
+          "group": "4 · Frameworks e drivers",
+          "layer": 1
+        },
+        {
+          "id": "fw_httpx",
+          "label": "httpx",
+          "kind": "external",
+          "info": "API Omie.",
+          "group": "4 · Frameworks e drivers",
+          "layer": 1
+        },
+        {
+          "id": "fw_crypto",
+          "label": "PyJWT · argon2-cffi · pyotp · cryptography",
+          "kind": "external",
+          "info": "ES256, Argon2id, TOTP, AES-256-GCM (segredos dos conectores).",
+          "group": "4 · Frameworks e drivers",
+          "layer": 1
+        },
+        {
+          "id": "fw_sci",
+          "label": "numpy · pandas · scikit-learn · statsmodels",
+          "kind": "external",
+          "info": "Única exceção permitida no anel 1 (matemática sem I/O).",
+          "group": "4 · Frameworks e drivers",
+          "layer": 1
+        },
+        {
+          "id": "in_http",
+          "label": "Rotas /api/v1",
+          "kind": "client",
+          "info": "adaptadores/entrada/api — esquemas Pydantic ↔ dataclasses; mapeia erros de domínio para HTTP (Problem Details).",
+          "group": "3a · Entrada",
+          "layer": 2
+        },
+        {
+          "id": "in_auth",
+          "label": "Middleware JWT",
+          "kind": "client",
+          "info": "adaptadores/entrada/api/seguranca — Bearer → valida (assinatura, iss, aud, exp) → Principal(usuario, tenant, papeis).",
+          "group": "3a · Entrada",
+          "layer": 2
+        },
+        {
+          "id": "in_worker",
+          "label": "Handlers de job",
+          "kind": "client",
+          "info": "adaptadores/entrada/worker",
+          "group": "3a · Entrada",
+          "layer": 2
+        },
+        {
+          "id": "in_cli",
+          "label": "Comandos CLI",
+          "kind": "client",
+          "info": "adaptadores/entrada/cli",
+          "group": "3a · Entrada",
+          "layer": 2
+        },
+        {
+          "id": "a_db",
+          "label": "Repositórios PostgreSQL",
+          "kind": "data",
+          "info": "adaptadores/saida/postgres — implementa Repositorios, FilaDeJobs, RepositorioDeSessoes; set_config('app.tenant_id', …, true).",
+          "group": "3b · Saída",
+          "layer": 2
+        },
+        {
+          "id": "a_dom",
+          "label": "Conector Domínio",
+          "kind": "external",
+          "info": "adaptadores/saida/conectores/dominio",
+          "group": "3b · Saída",
+          "layer": 2
+        },
+        {
+          "id": "a_omie",
+          "label": "Conector Omie",
+          "kind": "external",
+          "info": "adaptadores/saida/conectores/omie",
+          "group": "3b · Saída",
+          "layer": 2
+        },
+        {
+          "id": "a_csv",
+          "label": "Conector planilha",
+          "kind": "external",
+          "info": "adaptadores/saida/conectores/planilha",
+          "group": "3b · Saída",
+          "layer": 2
+        },
+        {
+          "id": "a_expf",
+          "label": "Exportador arquivo",
+          "kind": "external",
+          "info": "adaptadores/saida/exportadores/arquivo",
+          "group": "3b · Saída",
+          "layer": 2
+        },
+        {
+          "id": "a_jwt",
+          "label": "Emissor JWT ES256",
+          "kind": "external",
+          "info": "adaptadores/saida/seguranca/jwt — assina/valida, kid, JWKS.",
+          "group": "3b · Saída",
+          "layer": 2
+        },
+        {
+          "id": "a_hash",
+          "label": "Senha Argon2id + TOTP",
+          "kind": "external",
+          "info": "adaptadores/saida/seguranca/credenciais",
+          "group": "3b · Saída",
+          "layer": 2
+        },
+        {
+          "id": "uc_auth",
+          "label": "Autenticar / Renovar / TrocarInquilino / Sair",
+          "kind": "service",
+          "info": "aplicacao/autenticar — senha + MFA → par (acesso, refresh); rotação e detecção de reuso; bloqueio progressivo; auditoria.",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "uc_users",
+          "label": "GerenciarUsuarios",
+          "kind": "service",
+          "info": "aplicacao/usuarios — convite, papéis por inquilino, MFA obrigatório para aprovar/administrar.",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "uc_import",
+          "label": "ImportarDados",
+          "kind": "service",
+          "info": "aplicacao/importar",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "uc_estimar",
+          "label": "EstimarPolitica",
+          "kind": "service",
+          "info": "aplicacao/estimar_politica — anual → rascunho.",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "d_pol",
+          "label": "PublicarPolitica",
+          "kind": "service",
+          "info": "aplicacao/publicar_politica — exige papel 'aprovar'.",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "uc_simular",
+          "label": "SimularPolitica",
+          "kind": "service",
+          "info": "aplicacao/simular — laboratório síncrono (milissegundos para 10³ clientes).",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "m_recal",
+          "label": "Recalibrar",
+          "kind": "service",
+          "info": "aplicacao/recalibrar — fixa a versão de política no início; competência fechada; H_pad por empresa → soma por contrato → P*; recomendação com efeito só para contratos com reajuste na janela.",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "d_cot",
+          "label": "Cotar",
+          "kind": "service",
+          "info": "aplicacao/cotar — regime obrigatório; preço provisório = π_r (ADR-004); resposta com decomposição e motivo.",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "d_rec",
+          "label": "DecidirRecomendacao",
+          "kind": "service",
+          "info": "aplicacao/decidir — exige 'aprovar'.",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "d_exp",
+          "label": "ExportarTabela",
+          "kind": "service",
+          "info": "aplicacao/exportar",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "m_diag",
+          "label": "GerarDiagnostico",
+          "kind": "service",
+          "info": "aplicacao/diagnostico",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "p_rel",
+          "label": "Repositorios",
+          "kind": "decision",
+          "info": "Clientes, Politicas, Recomendacoes, Cotacoes, Usuarios, Auditoria + UnidadeDeTrabalho(tenant).",
+          "group": "2b · Portas",
+          "layer": 3,
+          "shape": "hexagon"
+        },
+        {
+          "id": "p_sess",
+          "label": "RepositorioDeSessoes",
+          "kind": "decision",
+          "info": "Famílias de refresh (hash), revogação.",
+          "group": "2b · Portas",
+          "layer": 3,
+          "shape": "hexagon"
+        },
+        {
+          "id": "p_job",
+          "label": "FilaDeJobs",
+          "kind": "decision",
+          "info": "",
+          "group": "2b · Portas",
+          "layer": 3,
+          "shape": "hexagon"
+        },
+        {
+          "id": "p_src",
+          "label": "ConectorDeOrigem",
+          "kind": "decision",
+          "info": "Define um pacote vertical.",
+          "group": "2b · Portas",
+          "layer": 3,
+          "shape": "hexagon"
+        },
+        {
+          "id": "p_exp",
+          "label": "Exportador",
+          "kind": "decision",
+          "info": "",
+          "group": "2b · Portas",
+          "layer": 3,
+          "shape": "hexagon"
+        },
+        {
+          "id": "p_tok",
+          "label": "EmissorDeTokens",
+          "kind": "decision",
+          "info": "emitir(Principal) / verificar(token).",
+          "group": "2b · Portas",
+          "layer": 3,
+          "shape": "hexagon"
+        },
+        {
+          "id": "p_cred",
+          "label": "VerificadorDeCredenciais",
+          "kind": "decision",
+          "info": "hash/verificar senha, verificar TOTP.",
+          "group": "2b · Portas",
+          "layer": 3,
+          "shape": "hexagon"
+        },
+        {
+          "id": "e_mod",
+          "label": "Modelos do domínio",
+          "kind": "service",
+          "info": "dominio/modelos — Contrato (unidade de preço, mês de reajuste, κ) e Empresa (direcionadores), Vinculo, PoliticaVersao (π, τ, β, θ, δ, κ̄, parâmetros congelados), IndiceInflacao, PrecoAlvo (com entradas), Recomendacao, Cotacao, Usuario, Principal.",
+          "group": "1a · Domínio",
+          "layer": 4
+        },
+        {
+          "id": "k_pol",
+          "label": "politica",
+          "kind": "decision",
+          "info": "P* = κ·max(π_r, τ·H_pad).",
+          "group": "1b · Precificação",
+          "layer": 4
+        },
+        {
+          "id": "k_teq",
+          "label": "equacoes_tempo",
+          "kind": "decision",
+          "info": "",
+          "group": "1b · Precificação",
+          "layer": 4
+        },
+        {
+          "id": "k_inf",
+          "label": "inferencia",
+          "kind": "decision",
+          "info": "dominio/precificacao/inferencia — ADR-004: sem histórico → π_r do regime; histórico parcial → credibilidade Z entre o preço próprio e π_r; vizinhos (Gower/kNN) só como opção futura da política.",
+          "group": "1b · Precificação",
+          "layer": 4
+        },
+        {
+          "id": "k_tr",
+          "label": "transicao",
+          "kind": "decision",
+          "info": "Algoritmo 3.",
+          "group": "1b · Precificação",
+          "layer": 4
+        },
+        {
+          "id": "k_gat",
+          "label": "gatilho",
+          "kind": "decision",
+          "info": "",
+          "group": "1b · Precificação",
+          "layer": 4
+        },
+        {
+          "id": "k_tar",
+          "label": "tarifa",
+          "kind": "decision",
+          "info": "Algoritmo 1.",
+          "group": "1b · Precificação",
+          "layer": 4
+        },
+        {
+          "id": "m_teq",
+          "label": "huber",
+          "kind": "service",
+          "info": "",
+          "group": "1c · Estimação",
+          "layer": 4
+        },
+        {
+          "id": "m_esf",
+          "label": "ridge",
+          "kind": "service",
+          "info": "Controle; fora da fórmula.",
+          "group": "1c · Estimação",
+          "layer": 4
+        },
+        {
+          "id": "m_viz",
+          "label": "vizinhanca",
+          "kind": "service",
+          "info": "dominio/estimacao/vizinhanca — Gower + kNN. FORA do MVP (ADR-004); opção da política a avaliar em F2/F3.",
+          "group": "1c · Estimação",
+          "layer": 4
+        },
+        {
+          "id": "m_sim",
+          "label": "simulador",
+          "kind": "service",
+          "info": "",
+          "group": "1c · Estimação",
+          "layer": 4
+        },
+        {
+          "id": "uc_vinc",
+          "label": "VincularEmpresas",
+          "kind": "service",
+          "info": "aplicacao/vincular — pendências empresa ↔ contrato; empresa sem vínculo não entra no cálculo silenciosamente (ADR-003).",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "uc_conc",
+          "label": "ConciliarCobranca",
+          "kind": "service",
+          "info": "aplicacao/conciliar — após importação: aprovado × cobrado → alerta.",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "uc_conn",
+          "label": "ConfigurarConector",
+          "kind": "service",
+          "info": "aplicacao/conectores — credenciais cifradas; testar conexão; nunca devolve o segredo.",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "uc_recup",
+          "label": "RecuperarAcesso",
+          "kind": "service",
+          "info": "aplicacao/recuperar_acesso — redefinição de senha, códigos de recuperação do MFA; revoga sessões.",
+          "group": "2a · Casos de uso",
+          "layer": 3
+        },
+        {
+          "id": "p_cif",
+          "label": "CifradorDeSegredos",
+          "kind": "decision",
+          "info": "cifrar/decifrar (envelope AES-256-GCM).",
+          "group": "2b · Portas",
+          "layer": 3,
+          "shape": "hexagon"
+        },
+        {
+          "id": "p_clock",
+          "label": "Relogio",
+          "kind": "decision",
+          "info": "agora(), competência atual; fixo nos testes.",
+          "group": "2b · Portas",
+          "layer": 3,
+          "shape": "hexagon"
+        },
+        {
+          "id": "a_cif",
+          "label": "Cifrador AES-GCM",
+          "kind": "external",
+          "info": "adaptadores/saida/seguranca/cifrador — chave mestra do ambiente.",
+          "group": "3b · Saída",
+          "layer": 2
+        },
+        {
+          "id": "a_clock",
+          "label": "Relógio do sistema",
+          "kind": "external",
+          "info": "adaptadores/saida/relogio — America/Sao_Paulo para competência; UTC no banco.",
+          "group": "3b · Saída",
+          "layer": 2
+        },
+        {
+          "id": "k_din",
+          "label": "dinheiro",
+          "kind": "decision",
+          "info": "dominio/precificacao/dinheiro — Decimal, ROUND_HALF_UP, 2 casas; arredondamento comercial opcional da política.",
+          "group": "1b · Precificação",
+          "layer": 4
+        },
+        {
+          "id": "k_agr",
+          "label": "agregacao_contrato",
+          "kind": "decision",
+          "info": "dominio/precificacao/agregacao — Σ H_pad das empresas, segmento da principal, nível mínimo (ADR-003).",
+          "group": "1b · Precificação",
+          "layer": 4
+        }
+      ],
+      "edges": [
+        {
+          "from": "cl_spa",
+          "to": "fw_fastapi",
+          "label": "HTTPS JSON · Bearer JWT",
+          "style": "solid",
+          "id": "emw9mo46rqqwqx"
+        },
+        {
+          "from": "fw_fastapi",
+          "to": "in_http",
+          "label": "monta rotas",
+          "style": "solid",
+          "id": "emw9mo46r283mr"
+        },
+        {
+          "from": "fw_fastapi",
+          "to": "in_auth",
+          "label": "middleware",
+          "style": "solid",
+          "id": "emw9mo46rsymdx"
+        },
+        {
+          "from": "fw_runtime",
+          "to": "in_worker",
+          "label": "despacha",
+          "style": "solid",
+          "id": "emw9mo46r2n20b"
+        },
+        {
+          "from": "fw_typer",
+          "to": "in_cli",
+          "label": "registra",
+          "style": "solid",
+          "id": "emw9mo46r4k1ez"
+        },
+        {
+          "from": "a_db",
+          "to": "fw_db",
+          "label": "usa",
+          "style": "dashed",
+          "id": "emw9mo46rg7f82"
+        },
+        {
+          "from": "a_dom",
+          "to": "fw_odbc",
+          "label": "usa",
+          "style": "dashed",
+          "id": "emw9mo46rd314b"
+        },
+        {
+          "from": "a_omie",
+          "to": "fw_httpx",
+          "label": "usa",
+          "style": "dashed",
+          "id": "emw9mo46rvn8x8"
+        },
+        {
+          "from": "a_jwt",
+          "to": "fw_crypto",
+          "label": "usa",
+          "style": "dashed",
+          "id": "emw9mo46risk5e"
+        },
+        {
+          "from": "a_hash",
+          "to": "fw_crypto",
+          "label": "usa",
+          "style": "dashed",
+          "id": "emw9mo46rbmt9f"
+        },
+        {
+          "from": "in_auth",
+          "to": "p_tok",
+          "label": "verificar",
+          "style": "solid",
+          "id": "emw9mo46rc8z0v"
+        },
+        {
+          "from": "in_auth",
+          "to": "in_http",
+          "label": "Principal",
+          "style": "solid",
+          "id": "emw9mo46rg3tzn"
+        },
+        {
+          "from": "in_http",
+          "to": "uc_auth",
+          "label": "/auth/*",
+          "style": "solid",
+          "id": "emw9mo46r7scaz"
+        },
+        {
+          "from": "in_http",
+          "to": "uc_users",
+          "style": "solid",
+          "id": "emw9mo46rymn1s"
+        },
+        {
+          "from": "in_http",
+          "to": "d_cot",
+          "style": "solid",
+          "id": "emw9mo46rqvyfd"
+        },
+        {
+          "from": "in_http",
+          "to": "d_rec",
+          "style": "solid",
+          "id": "emw9mo46ry09kw"
+        },
+        {
+          "from": "in_http",
+          "to": "d_pol",
+          "style": "solid",
+          "id": "emw9mo46rvhveb"
+        },
+        {
+          "from": "in_http",
+          "to": "uc_simular",
+          "style": "solid",
+          "id": "emw9mo46rjf6hj"
+        },
+        {
+          "from": "in_http",
+          "to": "m_diag",
+          "style": "solid",
+          "id": "emw9mo46rkgeye"
+        },
+        {
+          "from": "in_worker",
+          "to": "uc_import",
+          "style": "solid",
+          "id": "emw9mo46ric2s6"
+        },
+        {
+          "from": "in_worker",
+          "to": "m_recal",
+          "style": "solid",
+          "id": "emw9mo46rkfb54"
+        },
+        {
+          "from": "in_worker",
+          "to": "uc_estimar",
+          "style": "solid",
+          "id": "emw9mo46rlzr0m"
+        },
+        {
+          "from": "in_worker",
+          "to": "d_exp",
+          "style": "solid",
+          "id": "emw9mo46rjihzy"
+        },
+        {
+          "from": "in_cli",
+          "to": "uc_estimar",
+          "label": "laboratório",
+          "style": "solid",
+          "id": "emw9mo46r3vsu5"
+        },
+        {
+          "from": "in_cli",
+          "to": "uc_import",
+          "label": "carga histórica",
+          "style": "solid",
+          "id": "emw9mo46rin28x"
+        },
+        {
+          "from": "in_cli",
+          "to": "uc_users",
+          "label": "1º admin",
+          "style": "solid",
+          "id": "emw9mo46rjafda"
+        },
+        {
+          "from": "a_db",
+          "to": "p_rel",
+          "label": "implementa",
+          "style": "dashed",
+          "id": "emw9mo46rxi4w0"
+        },
+        {
+          "from": "a_db",
+          "to": "p_job",
+          "label": "implementa",
+          "style": "dashed",
+          "id": "emw9mo46racq79"
+        },
+        {
+          "from": "a_db",
+          "to": "p_sess",
+          "label": "implementa",
+          "style": "dashed",
+          "id": "emw9mo46rw6s29"
+        },
+        {
+          "from": "a_dom",
+          "to": "p_src",
+          "label": "implementa",
+          "style": "dashed",
+          "id": "emw9mo46r5dyq1"
+        },
+        {
+          "from": "a_omie",
+          "to": "p_src",
+          "label": "implementa",
+          "style": "dashed",
+          "id": "emw9mo46r001u8"
+        },
+        {
+          "from": "a_csv",
+          "to": "p_src",
+          "label": "implementa",
+          "style": "dashed",
+          "id": "emw9mo46rxetr5"
+        },
+        {
+          "from": "a_expf",
+          "to": "p_exp",
+          "label": "implementa",
+          "style": "dashed",
+          "id": "emw9mo46r5n9vo"
+        },
+        {
+          "from": "a_jwt",
+          "to": "p_tok",
+          "label": "implementa",
+          "style": "dashed",
+          "id": "emw9mo46rpnjp9"
+        },
+        {
+          "from": "a_hash",
+          "to": "p_cred",
+          "label": "implementa",
+          "style": "dashed",
+          "id": "emw9mo46r09eph"
+        },
+        {
+          "from": "uc_auth",
+          "to": "p_cred",
+          "style": "solid",
+          "id": "emw9mo46r57g8b"
+        },
+        {
+          "from": "uc_auth",
+          "to": "p_tok",
+          "style": "solid",
+          "id": "emw9mo46re3mf2"
+        },
+        {
+          "from": "uc_auth",
+          "to": "p_sess",
+          "style": "solid",
+          "id": "emw9mo46r3k7ma"
+        },
+        {
+          "from": "uc_auth",
+          "to": "p_rel",
+          "label": "usuário, auditoria",
+          "style": "solid",
+          "id": "emw9mo46ram855"
+        },
+        {
+          "from": "uc_users",
+          "to": "p_rel",
+          "style": "solid",
+          "id": "emw9mo46ryojly"
+        },
+        {
+          "from": "uc_users",
+          "to": "p_cred",
+          "style": "solid",
+          "id": "emw9mo46rz1w27"
+        },
+        {
+          "from": "uc_import",
+          "to": "p_src",
+          "style": "solid",
+          "id": "emw9mo46rk8uto"
+        },
+        {
+          "from": "uc_import",
+          "to": "p_rel",
+          "style": "solid",
+          "id": "emw9mo46rdn9wj"
+        },
+        {
+          "from": "m_recal",
+          "to": "p_rel",
+          "style": "solid",
+          "id": "emw9mo46rvsjy1"
+        },
+        {
+          "from": "d_cot",
+          "to": "p_rel",
+          "style": "solid",
+          "id": "emw9mo46r2pmom"
+        },
+        {
+          "from": "d_rec",
+          "to": "p_rel",
+          "style": "solid",
+          "id": "emw9mo46r2v6re"
+        },
+        {
+          "from": "d_pol",
+          "to": "p_rel",
+          "style": "solid",
+          "id": "emw9mo46rg6n8k"
+        },
+        {
+          "from": "d_exp",
+          "to": "p_exp",
+          "style": "solid",
+          "id": "emw9mo46ra9r91"
+        },
+        {
+          "from": "uc_estimar",
+          "to": "p_rel",
+          "style": "solid",
+          "id": "emw9mo46rg6zx4"
+        },
+        {
+          "from": "d_rec",
+          "to": "p_job",
+          "label": "agenda exportação",
+          "style": "solid",
+          "id": "emw9mo46rmp298"
+        },
+        {
+          "from": "m_recal",
+          "to": "k_teq",
+          "style": "solid",
+          "id": "emw9mo46rb2zjj"
+        },
+        {
+          "from": "m_recal",
+          "to": "k_pol",
+          "style": "solid",
+          "id": "emw9mo46rd5xqb"
+        },
+        {
+          "from": "m_recal",
+          "to": "k_inf",
+          "label": "ℓ < 2",
+          "style": "solid",
+          "id": "emw9mo46r3umrn"
+        },
+        {
+          "from": "m_recal",
+          "to": "k_tr",
+          "style": "solid",
+          "id": "emw9mo46rxbm68"
+        },
+        {
+          "from": "m_recal",
+          "to": "k_gat",
+          "style": "solid",
+          "id": "emw9mo46rneckj"
+        },
+        {
+          "from": "d_cot",
+          "to": "k_inf",
+          "style": "solid",
+          "id": "emw9mo46rhrkf4"
+        },
+        {
+          "from": "uc_simular",
+          "to": "m_sim",
+          "style": "solid",
+          "id": "emw9mo46r70pjk"
+        },
+        {
+          "from": "uc_estimar",
+          "to": "m_teq",
+          "style": "solid",
+          "id": "emw9mo46rf02iv"
+        },
+        {
+          "from": "uc_estimar",
+          "to": "m_esf",
+          "style": "solid",
+          "id": "emw9mo46rlfupz"
+        },
+        {
+          "from": "uc_estimar",
+          "to": "k_tar",
+          "style": "solid",
+          "id": "emw9mo46rpcn2o"
+        },
+        {
+          "from": "uc_estimar",
+          "to": "m_sim",
+          "style": "solid",
+          "id": "emw9mo46rtdyi1"
+        },
+        {
+          "from": "d_rec",
+          "to": "e_mod",
+          "label": "estado + papel",
+          "style": "solid",
+          "id": "emw9mo46rxcbvv"
+        },
+        {
+          "from": "d_pol",
+          "to": "e_mod",
+          "label": "versão imutável + papel",
+          "style": "solid",
+          "id": "emw9mo46rmtmtj"
+        },
+        {
+          "from": "uc_auth",
+          "to": "e_mod",
+          "label": "Principal",
+          "style": "solid",
+          "id": "emw9mo46r7nvsc"
+        },
+        {
+          "from": "m_diag",
+          "to": "m_esf",
+          "style": "solid",
+          "id": "emw9mo46rae8k0"
+        },
+        {
+          "from": "k_inf",
+          "to": "k_pol",
+          "style": "solid",
+          "id": "emw9mo46renmro"
+        },
+        {
+          "from": "m_sim",
+          "to": "k_pol",
+          "label": "mesma fórmula",
+          "style": "solid",
+          "id": "emw9mo46r6zucx"
+        },
+        {
+          "from": "m_sim",
+          "to": "k_tr",
+          "style": "solid",
+          "id": "emw9mo46rvfdoh"
+        },
+        {
+          "from": "k_pol",
+          "to": "e_mod",
+          "style": "solid",
+          "id": "emw9mo46rpg4as"
+        },
+        {
+          "from": "m_esf",
+          "to": "m_viz",
+          "label": "pesos",
+          "style": "dashed",
+          "id": "emw9mo46r9t5iu"
+        },
+        {
+          "from": "m_teq",
+          "to": "fw_sci",
+          "label": "exceção permitida",
+          "style": "dashed",
+          "id": "emw9mo46rg3rh5"
+        },
+        {
+          "from": "m_esf",
+          "to": "fw_sci",
+          "label": "exceção permitida",
+          "style": "dashed",
+          "id": "emw9mo46rzwno9"
+        },
+        {
+          "from": "in_http",
+          "to": "uc_vinc",
+          "style": "solid",
+          "id": "emw9mo46r79ptp"
+        },
+        {
+          "from": "in_http",
+          "to": "uc_conn",
+          "style": "solid",
+          "id": "emw9mo46r3j2gb"
+        },
+        {
+          "from": "in_http",
+          "to": "uc_recup",
+          "style": "solid",
+          "id": "emw9mo46rdi7sd"
+        },
+        {
+          "from": "in_worker",
+          "to": "uc_conc",
+          "style": "solid",
+          "id": "emw9mo46rbgjtg"
+        },
+        {
+          "from": "uc_vinc",
+          "to": "p_rel",
+          "style": "solid",
+          "id": "emw9mo46r8p46a"
+        },
+        {
+          "from": "uc_conc",
+          "to": "p_rel",
+          "style": "solid",
+          "id": "emw9mo46rufv6e"
+        },
+        {
+          "from": "uc_conn",
+          "to": "p_cif",
+          "style": "solid",
+          "id": "emw9mo46rrna72"
+        },
+        {
+          "from": "uc_conn",
+          "to": "p_rel",
+          "style": "solid",
+          "id": "emw9mo46remrta"
+        },
+        {
+          "from": "uc_recup",
+          "to": "p_cred",
+          "style": "solid",
+          "id": "emw9mo46r22j92"
+        },
+        {
+          "from": "uc_recup",
+          "to": "p_sess",
+          "label": "revoga",
+          "style": "solid",
+          "id": "emw9mo46rm7jgw"
+        },
+        {
+          "from": "uc_import",
+          "to": "p_cif",
+          "label": "credenciais",
+          "style": "solid",
+          "id": "emw9mo46r3tr5n"
+        },
+        {
+          "from": "a_cif",
+          "to": "p_cif",
+          "label": "implementa",
+          "style": "dashed",
+          "id": "emw9mo46rcp0az"
+        },
+        {
+          "from": "a_clock",
+          "to": "p_clock",
+          "label": "implementa",
+          "style": "dashed",
+          "id": "emw9mo46rzd3eg"
+        },
+        {
+          "from": "a_cif",
+          "to": "fw_crypto",
+          "label": "usa",
+          "style": "dashed",
+          "id": "emw9mo46rzfwnp"
+        },
+        {
+          "from": "m_recal",
+          "to": "p_clock",
+          "label": "competência",
+          "style": "solid",
+          "id": "emw9mo46r2fn3i"
+        },
+        {
+          "from": "uc_auth",
+          "to": "p_clock",
+          "label": "expiração",
+          "style": "solid",
+          "id": "emw9mo46rrhc86"
+        },
+        {
+          "from": "m_recal",
+          "to": "k_agr",
+          "style": "solid",
+          "id": "emw9mo46r2ok3h"
+        },
+        {
+          "from": "k_agr",
+          "to": "k_pol",
+          "style": "solid",
+          "id": "emw9mo46r8etjf"
+        },
+        {
+          "from": "k_pol",
+          "to": "k_din",
+          "style": "solid",
+          "id": "emw9mo46rw2ben"
+        },
+        {
+          "from": "k_tr",
+          "to": "k_din",
+          "style": "solid",
+          "id": "emw9mo46r0qlb8"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "label": "Frontend React (cliente)",
+      "direction": "TB",
+      "mode": "2d",
+      "layers": [
+        "Aplicação",
+        "Funcionalidades",
+        "Compartilhado",
+        "Servidor"
+      ],
+      "nodes": [
+        {
+          "id": "fe_app",
+          "label": "app/ (providers + rotas)",
+          "kind": "client",
+          "info": "React Router; QueryClientProvider; MantineProvider; AuthProvider; ErrorBoundary.",
+          "group": "app",
+          "layer": 0
+        },
+        {
+          "id": "fe_guard",
+          "label": "Guarda de rota por papel",
+          "kind": "decision",
+          "info": "Esconde ou bloqueia telas por papel (analisar, aprovar, administrar). É só conveniência de UI: quem autoriza é o backend.",
+          "group": "app",
+          "layer": 0
+        },
+        {
+          "id": "fe_login",
+          "label": "auth/",
+          "kind": "client",
+          "info": "Login + MFA (TOTP); token de acesso em memória; renovação silenciosa antes do exp e no 401 (uma tentativa, fila de requisições).",
+          "group": "features",
+          "layer": 1
+        },
+        {
+          "id": "fe_diag",
+          "label": "diagnostico/",
+          "kind": "client",
+          "info": "Curva preço/hora, Lorenz/Gini, índice de alinhamento, clientes desalinhados.",
+          "group": "features",
+          "layer": 1
+        },
+        {
+          "id": "fe_lab",
+          "label": "laboratorio/",
+          "kind": "client",
+          "info": "Edita rascunho de política (pisos, origem de τ, θ, δ) → POST /simulacoes → receita, % no piso, τ̂/τ*, trajetórias.",
+          "group": "features",
+          "layer": 1
+        },
+        {
+          "id": "fe_cot",
+          "label": "cotacao/",
+          "kind": "client",
+          "info": "Formulário com regime (obrigatório) e histórico parcial opcional → preço provisório, piso do regime, fator Z, decomposição e motivo (ADR-004).",
+          "group": "features",
+          "layer": 1
+        },
+        {
+          "id": "fe_rec",
+          "label": "recomendacoes/",
+          "kind": "client",
+          "info": "Fila PENDENTE; decomposição do preço; aprovar / ajustar κ (com justificativa) / rejeitar.",
+          "group": "features",
+          "layer": 1
+        },
+        {
+          "id": "fe_pol",
+          "label": "politicas/",
+          "kind": "client",
+          "info": "Versões, diff entre versões, publicação (papel aprovar).",
+          "group": "features",
+          "layer": 1
+        },
+        {
+          "id": "fe_adm",
+          "label": "admin/",
+          "kind": "client",
+          "info": "Usuários, papéis, MFA, conectores, segmentação.",
+          "group": "features",
+          "layer": 1
+        },
+        {
+          "id": "fe_api",
+          "label": "shared/api (gerado)",
+          "kind": "service",
+          "info": "openapi-typescript + openapi-fetch: tipos e cliente gerados do OpenAPI do backend; interceptador injeta Bearer e trata 401.",
+          "group": "shared",
+          "layer": 2
+        },
+        {
+          "id": "fe_query",
+          "label": "TanStack Query",
+          "kind": "service",
+          "info": "Cache do estado do servidor, invalidação após decisões.",
+          "group": "shared",
+          "layer": 2
+        },
+        {
+          "id": "fe_ui",
+          "label": "shared/ui + graficos",
+          "kind": "service",
+          "info": "Mantine, TanStack Table, ECharts. Formatação de moeda/percentual pt-BR.",
+          "group": "shared",
+          "layer": 2
+        },
+        {
+          "id": "fe_forms",
+          "label": "Formulários",
+          "kind": "service",
+          "info": "React Hook Form + Zod (validação de entrada; regras de negócio ficam no backend).",
+          "group": "shared",
+          "layer": 2
+        },
+        {
+          "id": "fe_be",
+          "label": "Backend /api/v1",
+          "kind": "external",
+          "info": "Contrato OpenAPI.",
+          "group": "servidor",
+          "layer": 3
+        }
+      ],
+      "edges": [
+        {
+          "from": "fe_app",
+          "to": "fe_guard",
+          "style": "solid",
+          "id": "emw9mo46rv0bn0"
+        },
+        {
+          "from": "fe_guard",
+          "to": "fe_diag",
+          "style": "solid",
+          "id": "emw9mo46r4xaax"
+        },
+        {
+          "from": "fe_guard",
+          "to": "fe_lab",
+          "style": "solid",
+          "id": "emw9mo46rqisxp"
+        },
+        {
+          "from": "fe_guard",
+          "to": "fe_cot",
+          "style": "solid",
+          "id": "emw9mo46rgpuk4"
+        },
+        {
+          "from": "fe_guard",
+          "to": "fe_rec",
+          "style": "solid",
+          "id": "emw9mo46r4kqlz"
+        },
+        {
+          "from": "fe_guard",
+          "to": "fe_pol",
+          "style": "solid",
+          "id": "emw9mo46rwqa1o"
+        },
+        {
+          "from": "fe_guard",
+          "to": "fe_adm",
+          "style": "solid",
+          "id": "emw9mo46rzeusq"
+        },
+        {
+          "from": "fe_app",
+          "to": "fe_login",
+          "style": "solid",
+          "id": "emw9mo46r0zzkm"
+        },
+        {
+          "from": "fe_diag",
+          "to": "fe_query",
+          "style": "solid",
+          "id": "emw9mo46r1kxpf"
+        },
+        {
+          "from": "fe_lab",
+          "to": "fe_query",
+          "style": "solid",
+          "id": "emw9mo46rxut4y"
+        },
+        {
+          "from": "fe_cot",
+          "to": "fe_query",
+          "style": "solid",
+          "id": "emw9mo46r9wgme"
+        },
+        {
+          "from": "fe_rec",
+          "to": "fe_query",
+          "style": "solid",
+          "id": "emw9mo46rq8qoy"
+        },
+        {
+          "from": "fe_pol",
+          "to": "fe_query",
+          "style": "solid",
+          "id": "emw9mo46rn3wzw"
+        },
+        {
+          "from": "fe_adm",
+          "to": "fe_query",
+          "style": "solid",
+          "id": "emw9mo46r6zd22"
+        },
+        {
+          "from": "fe_lab",
+          "to": "fe_forms",
+          "style": "solid",
+          "id": "emw9mo46ry677a"
+        },
+        {
+          "from": "fe_cot",
+          "to": "fe_forms",
+          "style": "solid",
+          "id": "emw9mo46r8fqm6"
+        },
+        {
+          "from": "fe_diag",
+          "to": "fe_ui",
+          "style": "solid",
+          "id": "emw9mo46rklkhf"
+        },
+        {
+          "from": "fe_lab",
+          "to": "fe_ui",
+          "style": "solid",
+          "id": "emw9mo46rrzgpx"
+        },
+        {
+          "from": "fe_rec",
+          "to": "fe_ui",
+          "style": "solid",
+          "id": "emw9mo46r8uzp5"
+        },
+        {
+          "from": "fe_query",
+          "to": "fe_api",
+          "style": "solid",
+          "id": "emw9mo46rdd22o"
+        },
+        {
+          "from": "fe_login",
+          "to": "fe_api",
+          "label": "login / renovar / sair",
+          "style": "solid",
+          "id": "emw9mo46ru5mcz"
+        },
+        {
+          "from": "fe_api",
+          "to": "fe_be",
+          "label": "HTTPS JSON · Bearer",
+          "style": "solid",
+          "id": "emw9mo46rnd5qd"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "label": "Pipeline e malha fechada",
+      "direction": "LR",
+      "nodes": [
+        {
+          "id": "f_src",
+          "label": "Sistemas de origem",
+          "kind": "external",
+          "info": "Via porta Conector de origem.",
+          "layer": 4
+        },
+        {
+          "id": "f_bruto",
+          "label": "raw (JSONB imutável)",
+          "kind": "data",
+          "info": "Uma linha por extração; permite reprocessar tudo.",
+          "layer": 3
+        },
+        {
+          "id": "f_limpo",
+          "label": "Validação + quarentena",
+          "kind": "service",
+          "info": "Tipos, domínios, unicidade, sessões > 12 h descartadas.",
+          "layer": 2
+        },
+        {
+          "id": "f_anal",
+          "label": "Analítico cliente×mês",
+          "kind": "data",
+          "info": "Tabela/visão em core.",
+          "layer": 3
+        },
+        {
+          "id": "f_teq",
+          "label": "Estimar equações de tempo (anual)",
+          "kind": "service",
+          "info": "Huber → β. Vira parte da próxima versão de política.",
+          "layer": 2
+        },
+        {
+          "id": "f_mod",
+          "label": "Ridge de controle (anual)",
+          "kind": "service",
+          "info": "Valida R²; pesos de Gower; candidatos a κ. Fora do caminho do preço.",
+          "layer": 2
+        },
+        {
+          "id": "f_tar",
+          "label": "Estimar τ (anual)",
+          "kind": "service",
+          "info": "Preço revelado ou custo; τ* só como referência.",
+          "layer": 2
+        },
+        {
+          "id": "f_pol",
+          "label": "Política publicada (versão)",
+          "kind": "decision",
+          "info": "π_r, τ, β, θ, δ, κ̄ — congelada durante o ciclo (lógica de preço-teto, seção 6.10).",
+          "layer": 2
+        },
+        {
+          "id": "f_hpad",
+          "label": "H_pad do mês (mensal)",
+          "kind": "service",
+          "info": "β publicados × médias de 12 meses.",
+          "layer": 2
+        },
+        {
+          "id": "f_inf",
+          "label": "Preço por nível ℓ",
+          "kind": "service",
+          "info": "ℓ=2 política; histórico parcial: credibilidade com π_r; sem histórico: π_r (ADR-004).",
+          "layer": 2
+        },
+        {
+          "id": "f_tr",
+          "label": "Transição",
+          "kind": "service",
+          "info": "Teto real θ; congela acima do alvo.",
+          "layer": 2
+        },
+        {
+          "id": "f_gat",
+          "label": "Gatilho",
+          "kind": "decision",
+          "info": "|ln(P/P*)| > ln 1,15.",
+          "layer": 2
+        },
+        {
+          "id": "f_hum",
+          "label": "Decisão do gestor",
+          "kind": "actor",
+          "info": "Aprovar / ajustar κ / rejeitar.",
+          "layer": 0
+        },
+        {
+          "id": "f_exp",
+          "label": "Exportação",
+          "kind": "external",
+          "info": "Financeiro cobra.",
+          "layer": 4
+        },
+        {
+          "id": "f_vinc",
+          "label": "Vínculo empresa → contrato",
+          "kind": "decision",
+          "info": "Pendências visíveis na UI (ADR-003).",
+          "layer": 2
+        },
+        {
+          "id": "f_agr",
+          "label": "Σ H_pad por contrato",
+          "kind": "service",
+          "info": "Agregação antes da política.",
+          "layer": 2
+        },
+        {
+          "id": "f_conc",
+          "label": "Conciliação",
+          "kind": "decision",
+          "info": "Aprovado × cobrado na importação seguinte → alerta.",
+          "layer": 2
+        }
+      ],
+      "edges": [
+        {
+          "from": "f_src",
+          "to": "f_bruto",
+          "label": "extração RO",
+          "style": "solid",
+          "id": "emw9mo46s32i57"
+        },
+        {
+          "from": "f_bruto",
+          "to": "f_limpo",
+          "style": "solid",
+          "id": "emw9mo46s9s57x"
+        },
+        {
+          "from": "f_anal",
+          "to": "f_teq",
+          "label": "12 meses",
+          "style": "solid",
+          "id": "emw9mo46s0bb26"
+        },
+        {
+          "from": "f_anal",
+          "to": "f_mod",
+          "style": "solid",
+          "id": "emw9mo46s9be52"
+        },
+        {
+          "from": "f_teq",
+          "to": "f_tar",
+          "label": "ϱ",
+          "style": "solid",
+          "id": "emw9mo46s3rxny"
+        },
+        {
+          "from": "f_teq",
+          "to": "f_pol",
+          "label": "β (rascunho)",
+          "style": "dashed",
+          "id": "emw9mo46smq6l5"
+        },
+        {
+          "from": "f_tar",
+          "to": "f_pol",
+          "label": "τ (rascunho)",
+          "style": "dashed",
+          "id": "emw9mo46sck8im"
+        },
+        {
+          "from": "f_mod",
+          "to": "f_pol",
+          "label": "relatório de validação",
+          "style": "dashed",
+          "id": "emw9mo46s8xmav"
+        },
+        {
+          "from": "f_anal",
+          "to": "f_hpad",
+          "label": "x̄ do mês",
+          "style": "solid",
+          "id": "emw9mo46sy5m9h"
+        },
+        {
+          "from": "f_pol",
+          "to": "f_hpad",
+          "label": "β vigentes",
+          "style": "solid",
+          "id": "emw9mo46snndq6"
+        },
+        {
+          "from": "f_pol",
+          "to": "f_inf",
+          "label": "π, τ",
+          "style": "solid",
+          "id": "emw9mo46sl2bbm"
+        },
+        {
+          "from": "f_inf",
+          "to": "f_tr",
+          "label": "P*",
+          "style": "solid",
+          "id": "emw9mo46sqj6h4"
+        },
+        {
+          "from": "f_tr",
+          "to": "f_gat",
+          "style": "solid",
+          "id": "emw9mo46sw5cda"
+        },
+        {
+          "from": "f_gat",
+          "to": "f_hum",
+          "label": "recomendação",
+          "style": "solid",
+          "id": "emw9mo46sf6gf7"
+        },
+        {
+          "from": "f_hum",
+          "to": "f_exp",
+          "label": "aprovada",
+          "style": "solid",
+          "id": "emw9mo46s9e7ib"
+        },
+        {
+          "from": "f_exp",
+          "to": "f_src",
+          "label": "novo F, novas horas (realimenta)",
+          "style": "dashed",
+          "id": "emw9mo46sljm52"
+        },
+        {
+          "from": "f_limpo",
+          "to": "f_vinc",
+          "style": "solid",
+          "id": "emw9mo46s4l8ei"
+        },
+        {
+          "from": "f_vinc",
+          "to": "f_anal",
+          "label": "empresa×mês + contrato",
+          "style": "solid",
+          "id": "emw9mo46sbefoi"
+        },
+        {
+          "from": "f_hpad",
+          "to": "f_agr",
+          "label": "por empresa",
+          "style": "solid",
+          "id": "emw9mo46s3lnwm"
+        },
+        {
+          "from": "f_agr",
+          "to": "f_inf",
+          "label": "por contrato",
+          "style": "solid",
+          "id": "emw9mo46sd8fdt"
+        },
+        {
+          "from": "f_src",
+          "to": "f_conc",
+          "label": "F cobrado",
+          "style": "solid",
+          "id": "emw9mo46spjau5"
+        },
+        {
+          "from": "f_conc",
+          "to": "f_hum",
+          "label": "divergência",
+          "style": "dashed",
+          "id": "emw9mo46skghr8"
+        }
+      ],
+      "layers": [
+        "Usuários",
+        "Borda",
+        "Serviços",
+        "Dados",
+        "Externos"
+      ]
+    }
+  ]
+}

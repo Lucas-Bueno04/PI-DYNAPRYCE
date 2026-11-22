@@ -1,0 +1,3179 @@
+{
+  "projeto": "dynaprice",
+  "titulo": "DynaPrice",
+  "ativo": true,
+  "atualizado_em": "2026-11-14T16:57:16-0300",
+  "plano": ".ada/projetos/dynaprice/plano.md",
+  "fase_atual": "F4",
+  "passo_atual": "F4.1",
+  "ciclo": {
+    "etapa": "executar",
+    "desde": "2026-11-11T00:30:54-0300"
+  },
+  "agora": {
+    "local": [
+      "frontend/"
+    ],
+    "o_que": "F1.32–F1.36: SPA",
+    "para_que": "Decisão humana na tela",
+    "como": "Vite, React, TS 5.9, Vitest, TDD"
+  },
+  "aguardando": [],
+  "fases": [
+    {
+      "id": "F0",
+      "nome": "Laboratório",
+      "status": "em_andamento",
+      "passos": [
+        {
+          "id": "F0.1",
+          "titulo": "Conferir versões e licenças das ferramentas do backend e do laboratório",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "fw_sci",
+            "fw_typer"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "docs/versoes.md registra, para Python, uv, ruff, mypy, pytest, hypothesis, import-linter, Typer, numpy, pandas, scikit-learn e statsmodels: versão estável atual, data, situação de manutenção, licença e fonte consultada; o que não foi comprovado fica 'a confirmar'",
+              "status": "ok",
+              "resumo": "docs/versoes.md: 12 pacotes do F0 + 15 do F1, com versão, data, Python, licença e fonte (PyPI JSON); a confirmar: httpx (sem release desde 2024-12), psycopg LGPL",
+              "em": "2026-11-09T17:14:40-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "se a versão estável do Python for diferente da 3.12 da ADR-001, a diferença está registrada como pergunta ao humano, sem trocar a versão",
+              "status": "ok",
+              "resumo": "Estável atual 3.15 ≠ 3.12 da ADR-001; registrado em docs/versoes.md e resolvido como D-PY = 3.14, pela diretiva de seguir as recomendações",
+              "em": "2026-11-09T17:14:40-0300"
+            }
+          ],
+          "nota": "loop: 27 pacotes conferidos no PyPI; D-PY = Python 3.14; 2 itens a confirmar (httpx, psycopg LGPL)",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.2",
+          "titulo": "Esqueleto do monorepo e do backend (uv, ruff, mypy, pytest, Typer)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "cli",
+            "in_cli",
+            "fw_typer"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv sync --locked && uv run ruff check . && uv run ruff format --check . && uv run mypy",
+              "status": "ok",
+              "resumo": "uv sync --locked (29 pacotes), ruff check ok, 17 arquivos formatados, mypy strict sem erros em 16 arquivos; Python 3.14.10",
+              "em": "2026-11-09T17:16:33-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/test_cli.py",
+              "status": "ok",
+              "resumo": "pytest tests/test_cli.py: 2 passed em 0,39 s",
+              "em": "2026-11-09T17:16:34-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "o repositório tem backend/, docs/adr/ (ADR-001 a ADR-004 com o texto das abas de mw9kw9fkffjn2), deploy/compose/ e um git local inicializado, sem remoto",
+              "status": "ok",
+              "resumo": "backend/, docs/adr/0001–0004 (exportadas das abas; ADR-001 com nota D-PY sincronizada na Ada), deploy/compose/.gitkeep, git local sem remoto e sem commit",
+              "em": "2026-11-09T17:16:34-0300"
+            },
+            {
+              "id": "A4",
+              "tipo": "criterio",
+              "valor": "docs/engenharia/principios.md referenciado no README do backend e seguido pelo esqueleto (Composition Root em principal.py)",
+              "status": "ok",
+              "resumo": "README do backend linka docs/engenharia/principios.md e as ADRs; principal.py é o Composition Root (montar_cli injeta versão e grupo lab)",
+              "em": "2026-11-09T17:16:34-0300"
+            }
+          ],
+          "nota": "loop: uv sync --locked ok; ruff ok; mypy strict 16 arquivos ok; pytest 2/2; git sem remoto; pendência menor: descrição da CLI diz 'serviços contábeis' (ajustar para serviços profissionais na F0.3)",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.3",
+          "titulo": "Contratos do import-linter para os 4 anéis, com a exceção de dominio/estimacao",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "e_mod",
+            "k_pol",
+            "m_teq",
+            "fw_sci",
+            "legenda"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run lint-imports",
+              "status": "ok",
+              "resumo": "lint-imports: 3 contratos kept, 0 broken (camadas; numéricas só em estimacao; domínio/aplicação sem frameworks)",
+              "em": "2026-11-09T17:17:53-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/arquitetura",
+              "status": "ok",
+              "resumo": "pytest tests/arquitetura: 12 passed (2,66 s); suíte total 14 passed",
+              "em": "2026-11-09T17:17:54-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "um módulo de teste que importa adaptadores a partir de dominio faz o lint-imports falhar; numpy/pandas/scikit-learn/statsmodels só são aceitos em dominio/estimacao; dominio/precificacao importa só a biblioteca padrão",
+              "status": "ok",
+              "resumo": "testes injetam violações numa cópia: dominio→adaptadores e aplicacao→principal quebram camadas; numpy/pandas/sklearn/statsmodels/scipy em precificacao quebram; numpy em estimacao passa; typer em modelos quebra; varredura AST garante só stdlib em precificacao e modelos",
+              "em": "2026-11-09T17:17:54-0300"
+            }
+          ],
+          "nota": "loop: lint-imports 3/3 kept; tests/arquitetura 12 passed; ruff/mypy ok; suíte 14 passed",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.4",
+          "titulo": "Perfil mínimo do ambiente local (.ada/perfil.json) com os alvos de teste do backend",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "cli"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "node \"/home/lucas/ada/skills/ada/scripts/ada.mjs\" testar backend",
+              "status": "ok",
+              "resumo": "ada testar backend → comando rodado: ruff ok, mypy ok, lint-imports 3/3 kept, pytest 14 passed; resultado gravado",
+              "em": "2026-11-09T17:18:22-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "o perfil segue docs/perfil.md da Ada, tem só o lugar 'local' e os alvos backend (ruff, mypy, lint-imports, pytest); nenhum alvo remoto",
+              "status": "ok",
+              "resumo": ".ada/perfil.json: versão 1, só o lugar 'local' no mapa, alvos backend e backend-arquitetura, sem remoto nem verificações remotas; ada perfil: sem problemas; commit automático desligado (publicação: humano)",
+              "em": "2026-11-09T17:18:22-0300"
+            }
+          ],
+          "nota": "loop: ada perfil sem problemas; alvo backend ok (14 passed, 3/3 contratos)",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.5",
+          "titulo": "Modelos do domínio mínimos (Regime, Empresa, Contrato, Vinculo, PoliticaVersao)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "e_mod"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/dominio/modelos",
+              "status": "ok",
+              "resumo": "58 testes em tests/dominio/modelos verdes (inclui hypothesis de κ)",
+              "em": "2026-11-09T21:22:51-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "PoliticaVersao é imutável (atribuição levanta erro) e valida π_r para MEI, SN, LP e LR, τ > 0, θ ≥ 0, δ ≥ 0, κ̄ > 0, s²/v² > 0 e sem_historico = 'piso_regime'; valores monetários são Decimal",
+              "status": "ok",
+              "resumo": "test_politica: FrozenInstanceError/TypeError em atribuição e nos mapas; 13 documentos inválidos recusados (pisos MEI/SN/LP/LR, τ>0, θ,δ≥0, κ̄∈[1;1,2], s²/v²>0, sem_historico=piso_regime, float recusado); Decimal em pisos e tarifa",
+              "em": "2026-11-09T21:22:51-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "Kappa é objeto de valor que rejeita κ < 1,0 ou κ > 1,2 (D12 revisada); desconto negociado é campo separado",
+              "status": "ok",
+              "resumo": "Kappa rejeita <1,0 e >1,2 (hypothesis) e acima de κ̄ da política; DescontoNegociado separado, justificativa >5%",
+              "em": "2026-11-09T21:22:51-0300"
+            }
+          ],
+          "nota": "loop: 87 testes; e_mod com Dinheiro, Horas, Tarifa, Kappa, DescontoNegociado, Competencia, Regime, Departamento, EquacaoDeTempo, PoliticaVersao (+estados), fabricar_politica (Factory), Empresa, Contrato, Vinculo, Direcionadores; complexidade máx ≤ 8",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.6",
+          "titulo": "Gerador de carteira sintética (G1) calibrado na seção 9 do artigo",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "f_src",
+            "p_src",
+            "in_cli"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/sintetico",
+              "status": "ok",
+              "resumo": "tests/sintetico: 25 testes verdes (estrutura, calibração, arquivos, cli)",
+              "em": "2026-11-09T21:30:13-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "comando",
+              "valor": "cd backend && uv run dynaprice lab sintetico --semente 42 --saida build/sintetico-42",
+              "status": "ok",
+              "resumo": "dynaprice lab sintetico --semente 42: 500 contratos, 846 empresas, 9941 meses-empresa em 0,9 s",
+              "em": "2026-11-09T21:30:13-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "a mesma semente gera arquivos idênticos byte a byte (hash conferido no teste)",
+              "status": "ok",
+              "resumo": "test_mesma_semente_gera_arquivos_identicos_byte_a_byte: sha256 dos 6 CSV iguais; semente diferente muda",
+              "em": "2026-11-09T21:30:13-0300"
+            },
+            {
+              "id": "A4",
+              "tipo": "criterio",
+              "valor": "docs/lab/calibracao_sintetica.md lista as faixas tiradas da seção 9 do artigo (regimes, direcionadores, β geradores, preço pela regra implícita, contratos com várias empresas e mistos, cerca de 10% sem vínculo) e o teste confere que a carteira gerada cai nelas",
+              "status": "ok",
+              "resumo": "calibracao_sintetica.md com faixas e 'Calibração adotada'; testes: ~10% sem vínculo, ~1/3 sem honorário próprio, 5% mistos, ρ≈0,85, a/b da regra implícita, τ̂≈103, P̄≈88, departamentos",
+              "em": "2026-11-09T21:30:14-0300"
+            }
+          ],
+          "nota": "loop: 114 testes; porta FonteDeCarteira/EscritorDeCarteira, caso de uso ExportarCarteira, adaptador sintético (Facade + planejador/esforço/honorários), CSV por TabelaCsv (refatorado após portão de complexidade 9>8); Empresa.departamentos",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.7",
+          "titulo": "k_din: dinheiro em Decimal, ROUND_HALF_UP, 2 casas, arredondamento comercial opcional",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "k_din"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/dominio/precificacao/test_dinheiro.py",
+              "status": "ok",
+              "resumo": "8 testes de test_dinheiro verdes (hypothesis: erro ≤ 0,005 e múltiplo)",
+              "em": "2026-11-09T21:31:20-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "arredondamento comercial (múltiplo de 5 ou 10) existe só como parâmetro da política, desligado por padrão até a decisão D11",
+              "status": "ok",
+              "resumo": "PoliticaVersao.arredondamento_multiplo None por padrão; comercial só pelo documento",
+              "em": "2026-11-09T21:31:20-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "mypy strict garante que as funções públicas de dominio/precificacao recebem e devolvem Decimal para valores monetários",
+              "status": "ok",
+              "resumo": "mypy strict ok + test_tipos: nenhuma assinatura pública de dominio/precificacao usa float",
+              "em": "2026-11-09T21:31:21-0300"
+            }
+          ],
+          "nota": "loop: k_din: Strategy Arredondamento (centavo padrão; comercial por arredondamento.multiplo na política); 127 testes",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.8",
+          "titulo": "k_teq: horas-padrão por departamento a partir dos β publicados",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "k_teq",
+            "f_hpad",
+            "s_teq"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/dominio/precificacao/test_equacoes_tempo.py",
+              "status": "ok",
+              "resumo": "10 testes de test_equacoes_tempo verdes (hypothesis: linearidade 6.3 e piso Σβ0 6.6)",
+              "em": "2026-11-09T21:32:36-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "com os β da Tabela 4 e 30 NF, 40 lançamentos e 2 empregados: fiscal 2,785 h, contábil 2,483 h, folha 0,667 h, total 5,935 h",
+              "status": "ok",
+              "resumo": "fiscal 2,785; contábil 2,483; folha 0,667; total 5,935 exato (test_tabela_7)",
+              "em": "2026-11-09T21:32:36-0300"
+            }
+          ],
+          "nota": "loop: k_teq: EquacoesDeTempo + HorasPadrao (minutos, divisão única) + media_dos_direcionadores; 136 testes",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.9",
+          "titulo": "k_pol: P* = κ·max(π_r, τ·H_pad) com testes de propriedade da Proposição 3",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "k_pol",
+            "s_pol"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/dominio/precificacao/test_politica.py",
+              "status": "ok",
+              "resumo": "12 testes de test_politica verdes",
+              "em": "2026-11-09T21:33:05-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "τ = 103,5, H_pad = 5,935, π_LP = 235, κ = 1 dá 614,27 com piso_vinculante falso",
+              "status": "ok",
+              "resumo": "test_tabela_7_sem_piso_vinculante: 614,27 (exato 614,2725), piso_vinculante falso",
+              "em": "2026-11-09T21:33:05-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "hypothesis verifica a Proposição 3: P ≥ max(π_r, τ·H_pad) (A1, A2), igualdade com κ = 1, não decrescente, contínua e convexa em H_pad",
+              "status": "ok",
+              "resumo": "hypothesis: A1/A2, minimalidade κ=1, A4 monotonia, Lipschitz κτ (continuidade), convexidade, A3 proporcionalidade",
+              "em": "2026-11-09T21:33:06-0300"
+            },
+            {
+              "id": "A4",
+              "tipo": "criterio",
+              "valor": "κ fora do intervalo κ̄ da política é rejeitado com erro de domínio",
+              "status": "ok",
+              "resumo": "test_kappa_acima_do_teto_da_politica_e_rejeitado (ValorInvalido); Kappa.de rejeita fora de [1;1,2]",
+              "em": "2026-11-09T21:33:06-0300"
+            }
+          ],
+          "nota": "loop: k_pol: PoliticaDePreco + PrecoAlvo (decomposição, piso_vinculante, H† Eq. 60); 148 testes",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.10",
+          "titulo": "k_agr: soma de H_pad por contrato, segmento da empresa principal, nível mínimo (ADR-003)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "k_agr",
+            "f_agr",
+            "f_vinc"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/dominio/precificacao/test_agregacao.py",
+              "status": "ok",
+              "resumo": "7 testes de test_agregacao verdes",
+              "em": "2026-11-09T21:34:17-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "empresa sem vínculo vigente na competência sai como pendência e nunca entra na soma",
+              "status": "ok",
+              "resumo": "test_empresa_sem_vinculo_vigente_vira_pendencia: solta e vínculo expirado fora da soma (5,935 só da principal)",
+              "em": "2026-11-09T21:34:17-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "a regra de segmento do contrato fica numa única função, para que a decisão D1 mude só ela",
+              "status": "ok",
+              "resumo": "regime_da_principal é a única regra (Strategy RegraDeSegmento); test_regra_de_segmento_injetavel_muda_so_o_segmento",
+              "em": "2026-11-09T21:34:17-0300"
+            }
+          ],
+          "nota": "loop: k_agr: AgregadorDeContratos (Σ H_pad por empresa com vínculo vigente), pendências SEM_VINCULO/VINCULO_DUPLICADO/SEM_PRINCIPAL, RegraDeSegmento injetável (D1), alerta de misto; 155 testes",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.11",
+          "titulo": "k_inf: nível de informação e cascata de preço da ADR-004 (piso, credibilidade Z, política)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "k_inf",
+            "f_inf"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/dominio/precificacao/test_inferencia.py",
+              "status": "ok",
+              "resumo": "9 testes de test_inferencia verdes",
+              "em": "2026-11-09T21:35:34-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "sem histórico devolve π_r do regime; com m meses, Z = m/(m + s²/v²) e o preço fica entre π_r e κ·max(π_r, τ·H_pad,pr) (hypothesis); com 12 meses, ℓ = 2 e delega a k_pol",
+              "status": "ok",
+              "resumo": "sem histórico = π_r; Z = 0,75 com 6 meses e s²/v² = 2; hypothesis: π_r ≤ P ≤ κ·max(π_r, τ·H_pr); 12 meses delega a k_pol (614,27)",
+              "em": "2026-11-09T21:35:34-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "regime ausente é rejeitado (não existe nível 0)",
+              "status": "ok",
+              "resumo": "test_regime_ausente_e_rejeitado (ValorInvalido)",
+              "em": "2026-11-09T21:35:34-0300"
+            }
+          ],
+          "nota": "loop: k_inf: NivelDeInformacao, fator_de_credibilidade (Eq. 56), InferenciaDePreco (Eq. 79), Strategy BaseSemHistorico com PisoDoRegime (ADR-004); 164 testes",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.12",
+          "titulo": "k_tr e k_gat: transição (Algoritmo 3) e gatilho, com testes de propriedade da Proposição 8",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "k_tr",
+            "k_gat",
+            "f_tr",
+            "f_gat",
+            "s_tr"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/dominio/precificacao/test_transicao.py tests/dominio/precificacao/test_gatilho.py",
+              "status": "ok",
+              "resumo": "17 testes de test_transicao e test_gatilho verdes",
+              "em": "2026-11-09T21:36:58-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "hypothesis verifica a Proposição 8: nominal nunca diminui, alta real por ciclo ≤ 1 + θ, nunca ultrapassa o alvo partindo de baixo, chega em ⌈ln G/ln(1+θ)⌉ ciclos com alvo real constante",
+              "status": "ok",
+              "resumo": "hypothesis Prop. 8: (a) nunca diminui, (b) ≤ B(1+θ)+½ centavo, (c) não ultrapassa, (d) ciclos = ⌈ln G/ln(1+θ)⌉; trajetória 437→502,55→577,93→614,27",
+              "em": "2026-11-09T21:36:58-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "alvo abaixo do vigente congela o nominal; desvio dentro da zona morta (|ln(P/P*)| ≤ ln(1+δ)) não gera recomendação; revisão integral (sem θ) existe como opção explícita da chamada",
+              "status": "ok",
+              "resumo": "test_alvo_abaixo_do_vigente_corrigido_congela_nominal; test_zona_morta_nao_dispara (+14%/−13%); revisao_integral=True explícito",
+              "em": "2026-11-09T21:36:59-0300"
+            }
+          ],
+          "nota": "loop: k_tr RegraDeTransicao (Eq. 72, contenção pós-arredondamento) + ciclos_ate_o_alvo (Eq. 73) + k_gat GatilhoDeRevisao (Eq. 74); 181 testes",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.13",
+          "titulo": "k_tar: τ̂ revelado (Algoritmo 1) e τ* de receita constante, com propriedades da Proposição 7",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "k_tar",
+            "f_tar"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/dominio/precificacao/test_tarifa.py",
+              "status": "ok",
+              "resumo": "9 testes de test_tarifa verdes",
+              "em": "2026-11-09T21:38:16-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "hypothesis verifica a Proposição 7 (τ̂ ≥ τ*, P(τ*) ≤ P(τ̂) ≤ (τ̂/τ*)·P(τ*), R0 ≤ R(τ̂) ≤ (τ̂/τ*)·R0) e a solução exata da Proposição 5 coincide com uma busca numérica",
+              "status": "ok",
+              "resumo": "hypothesis (150 casos cada): Prop. 7 (a)(b)(c) e Prop. 5 exata = bisseção com |Δ| ≤ 1e-8",
+              "em": "2026-11-09T21:38:16-0300"
+            }
+          ],
+          "nota": "loop: k_tar: Strategy EstimadorDeTarifa (PrecoRevelado Eq. 65, AncoradaEmCusto Eq. 63–64, ReceitaAlvo exata Prop. 5/Eq. 67), receita Eq. 66, bisseção Eq. 68; 190 testes",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.14",
+          "titulo": "Teste de aceite da Tabela 7 no núcleo (simulação mw9kw9i514upw:7, passos 1 a 6)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "k_teq",
+            "k_pol",
+            "k_tr",
+            "k_gat",
+            "k_din",
+            "s_teq",
+            "s_pol",
+            "s_tr",
+            "s_rec"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aceite/test_sim_tabela7.py",
+              "status": "ok",
+              "resumo": "1 passed (tests/aceite/test_sim_tabela7.py)",
+              "em": "2026-11-09T21:38:57-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:7",
+              "status": "ok",
+              "resumo": "ada resultado --simulacao mw9kw9i514upw:7 ok: 6/7 passos",
+              "em": "2026-11-09T21:38:57-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "preço-alvo 614,27, G = 1,41, 3 ciclos e trajetória exata 437 → 502,55 → 577,93 → 614,27 sem ultrapassar o alvo; o resultado registra que o passo 7 (decisão humana) fica para F1.31",
+              "status": "ok",
+              "resumo": "614,27; G = 1,41; 3 ciclos; 437→502,55→577,93→614,27 sem ultrapassar; passo 7 registrado para F1.31",
+              "em": "2026-11-09T21:38:58-0300"
+            }
+          ],
+          "nota": "loop: aceite do núcleo: tests/aceite/test_sim_tabela7.py encadeia k_agr→k_inf→k_teq→k_pol→k_gat→k_tr; 6/7 passos",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.15",
+          "titulo": "Desenhar e testar as simulações de erro do núcleo (piso vinculante, alvo abaixo do vigente, zona morta, κ fora de κ̄)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "k_pol",
+            "k_tr",
+            "k_gat",
+            "k_inf"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aceite",
+              "status": "ok",
+              "resumo": "tests/aceite: 4 passed",
+              "em": "2026-11-09T21:40:20-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "as simulações 'piso vinculante e alvo abaixo do vigente' (lacuna 9.5), 'desvio dentro da zona morta' e 'κ fora de κ̄' existem em mw9kw9i514upw, foram ligadas a este passo com `ada estado aceite add F0.15 --simulacao <ref>` e o teste de cada uma está ok",
+              "status": "ok",
+              "resumo": "simulações 8, 9 e 10 criadas no diagrama de processos (v6), ligadas por aceite add e ok",
+              "em": "2026-11-09T21:40:20-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:8",
+              "status": "ok",
+              "resumo": "mw9kw9i514upw:8 ok 4/4",
+              "em": "2026-11-09T21:40:21-0300"
+            },
+            {
+              "id": "A4",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:9",
+              "status": "ok",
+              "resumo": "mw9kw9i514upw:9 ok 2/2",
+              "em": "2026-11-09T21:40:21-0300"
+            },
+            {
+              "id": "A5",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:10",
+              "status": "ok",
+              "resumo": "mw9kw9i514upw:10 ok 3/3",
+              "em": "2026-11-09T21:40:21-0300"
+            }
+          ],
+          "nota": "loop: 3 simulações de erro desenhadas (mw9kw9i514upw:8, 9, 10) e testadas em tests/aceite/test_sim_erros_nucleo.py; 194 testes",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.16",
+          "titulo": "m_teq: estimação das equações de tempo por Huber, reprodutível",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "m_teq",
+            "f_teq",
+            "fw_sci"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && OMP_NUM_THREADS=1 uv run pytest tests/dominio/estimacao/test_huber.py",
+              "status": "ok",
+              "resumo": "OMP_NUM_THREADS=1 pytest tests/dominio/estimacao/test_huber.py: 8 passed",
+              "em": "2026-11-09T22:31:19-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "na carteira sintética de semente 42, cada β estimado cai no intervalo declarado em torno do β gerador; duas execuções seguidas dão β idênticos",
+              "status": "ok",
+              "resumo": "β0 e inclinações em [0,75;1,25]×β gerador (eventos raros admissões/rescisões em [0,5;1,5]); duas execuções dão EquacaoEstimada idêntica",
+              "em": "2026-11-09T22:31:19-0300"
+            }
+          ],
+          "nota": "loop: m_teq: EstimadorHuber (statsmodels RLM HuberT c=1,345), amostras por departamento (refatorado após complexidade 12>8), mix por empresa no gerador; 202 testes",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.17",
+          "titulo": "m_esf: Ridge log-log como controle, fora do caminho do preço",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "m_esf",
+            "f_mod",
+            "fw_sci"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/dominio/estimacao/test_ridge.py",
+              "status": "ok",
+              "resumo": "8 testes de test_ridge verdes (hypothesis: Eq. 44 = mínimos quadrados aumentados)",
+              "em": "2026-11-09T22:40:51-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "comando",
+              "valor": "cd backend && uv run lint-imports",
+              "status": "ok",
+              "resumo": "lint-imports: 4 contratos kept",
+              "em": "2026-11-09T22:40:53-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "contrato do import-linter impede dominio/precificacao e aplicacao de importar o Ridge",
+              "status": "ok",
+              "resumo": "contrato 'Estimação fora da fórmula de preço' + test_precificacao_/test_aplicacao_importando_o_ridge_quebra_o_contrato",
+              "em": "2026-11-09T22:40:54-0300"
+            }
+          ],
+          "nota": "loop: m_esf: Ridge (Eq. 44, gl Eq. 45, CV 5 partes, 20 λ) sobre ln H̄ x ln(1+x̄) + regime + departamentos atendidos; R² CV 0,87 na semente 42; gerador zera direcionadores de departamento não atendido; contrato E2 no import-linter; 211 testes",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.18",
+          "titulo": "m_sim: simulador de políticas com a implementação única do preço e sensibilidade de θ e δ",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "m_sim",
+            "uc_simular",
+            "k_pol",
+            "k_tr",
+            "k_inf"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/dominio/estimacao/test_simulador.py",
+              "status": "ok",
+              "resumo": "6 testes de test_simulador verdes",
+              "em": "2026-11-09T22:48:11-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "o simulador chama k_pol, k_inf, k_tr e k_din (teste de arquitetura: não existe segunda fórmula de preço)",
+              "status": "ok",
+              "resumo": "test_nao_existe_segunda_formula: espiona preco_alvo/proximo e verifica pelo AST que o simulador não acessa tarifa/piso/θ",
+              "em": "2026-11-09T22:48:11-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "10³ contratos simulados em menos de 5 s na máquina local; saída com receita, % no piso, % no teto, ciclos até o alvo e s²/v²",
+              "status": "ok",
+              "resumo": "test_mil_contratos_em_menos_de_cinco_segundos ok; saída com receitas, % no piso/teto, ciclos e s²/v²",
+              "em": "2026-11-09T22:48:12-0300"
+            }
+          ],
+          "nota": "loop: m_sim: SimuladorDePolitica (R0, ΣP*, R1 Eq. 70, % piso/teto/congelados/gatilho, ciclos) sobre NucleoDePreco (Factory única do núcleo), s²/v² (credibilidade.py), entrada a partir da carteira; 216 testes",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.19",
+          "titulo": "Diagnóstico e relatório de laboratório pela cli (sobre a carteira sintética)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "m_diag",
+            "uc_simular",
+            "in_cli",
+            "fw_typer",
+            "f_anal"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run dynaprice lab relatorio --entrada build/sintetico-42 --saida build/relatorio-sintetico",
+              "status": "ok",
+              "resumo": "dynaprice lab relatorio --entrada build/sintetico-42 --saida build/relatorio-sintetico: 13 seções",
+              "em": "2026-11-09T22:55:13-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aceite/test_relatorio_lab.py",
+              "status": "ok",
+              "resumo": "tests/aceite/test_relatorio_lab.py: 4 passed",
+              "em": "2026-11-09T22:55:13-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "o relatório tem: curva preço/hora, Lorenz/Gini, desalinhados, β com intervalo e R² por departamento, resíduos por regime, π_r proposto por regime, τ̂ e τ*, sensibilidade de θ/δ, s²/v², contratos mistos, mudanças de regime na janela e dias de fechamento, cada valor com a fonte",
+              "status": "ok",
+              "resumo": "seções: curva, Lorenz/Gini, desalinhados, β com IC e R², resíduos por regime, π_r (P10) com τ̂·Σβ0, τ̂ e τ*, grade θ×δ, s²/v², mistos, regime (não medível no sintético), fechamento (não medível); cada item com fonte",
+              "em": "2026-11-09T22:55:13-0300"
+            }
+          ],
+          "nota": "loop: m_diag: AnalisadorDoLaboratorio (contexto, calibração D2/D3/s²v², 13 seções) via porta AnalisadorDeCarteira (DIP, E2 preservado); LeitorDeCarteiraCsv + teste de contrato da FonteDeCarteira; EscritorDeRelatorioMarkdown; dynaprice lab relatorio; rascunho de política JSON; 238 testes",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.20",
+          "titulo": "Layout da planilha e leitor de laboratório para os dados reais, com minimização",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "a_csv",
+            "planilha",
+            "src_cad",
+            "f_limpo"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/adaptadores/test_planilha_lab.py",
+              "status": "ok",
+              "resumo": "tests/adaptadores/test_planilha_lab.py: 9 passed (+ planilha no teste de contrato da FonteDeCarteira)",
+              "em": "2026-11-09T22:59:26-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "docs/lab/layout_planilha.md descreve as colunas pedidas ao escritório (só contagens de folha, documento pseudonimizado na entrada)",
+              "status": "ok",
+              "resumo": "docs/lab/layout_planilha.md: 6 arquivos, só contagens de folha, documento pseudonimizado na leitura",
+              "em": "2026-11-09T22:59:26-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "teste de campos proibidos: nome, CPF e linhas de empregado nunca chegam ao dataframe do laboratório",
+              "status": "ok",
+              "resumo": "test_documento_nunca_chega_a_carteira, test_campos_proibidos_nunca_chegam, test_linhas_de_empregado_sao_recusadas, test_movimento_com_coluna_de_pessoa_e_recusado",
+              "em": "2026-11-09T22:59:26-0300"
+            },
+            {
+              "id": "A4",
+              "tipo": "criterio",
+              "valor": "os dados reais ficam fora do repositório, em pasta listada no .gitignore",
+              "status": "ok",
+              "resumo": "dados/ no .gitignore (test_dados_reais_fora_do_repositorio)",
+              "em": "2026-11-09T22:59:27-0300"
+            }
+          ],
+          "nota": "loop: LeitorDePlanilhaDoEscritorio (FonteDeCarteira; lista de permissão de colunas; pseudônimo HMAC-SHA256 na entrada; recusa CPF/salário/linhas de empregado) + Pseudonimizador; layout em docs/lab/layout_planilha.md; cli --fonte planilha com DYNAPRICE_CHAVE_PSEUDONIMO; Huber trata direcionador sem variação; 252 testes",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.21",
+          "titulo": "Validar o acesso somente leitura ao Domínio (ODBC) com a TI do escritório",
+          "status": "adiado",
+          "local": [],
+          "nos": [
+            "a_dom",
+            "fw_odbc",
+            "src_esc",
+            "dp_src"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "docs/lab/acesso_dominio.md registra SGBD e versão, driver ODBC para Linux e licença, caminho de rede, TLS e uma consulta de contagem feita com usuário somente leitura; ou registra 'inacessível' e o plano B por planilha",
+              "status": "pendente"
+            }
+          ],
+          "nota": "Depende da TI do escritório e da aprovação do responsável; MCP dominio não conecta. Roteiro em docs/lab/acesso_dominio.md; plano B (planilha, F0.20) pronto. Retomar no fim do projeto."
+        },
+        {
+          "id": "F0.22",
+          "titulo": "Relatório de laboratório com os dados reais do escritório",
+          "status": "adiado",
+          "local": [],
+          "nos": [
+            "m_teq",
+            "m_esf",
+            "m_sim",
+            "m_diag",
+            "k_tar"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aceite/test_relatorio_lab.py",
+              "status": "pendente"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "relatório real com π_r proposto por regime comparado à tabela atual (D2), τ̂ e τ* (D3), sensibilidade de θ/δ (D4), dias de fechamento medidos (D10), contratos mistos (D1) e mudanças de regime (D13), mais R² e β comparados à seção 9 do artigo",
+              "status": "pendente"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "tempo da recalibração de um tenant estimado no laboratório e comparado à meta de 5 minutos (RNF, a confirmar)",
+              "status": "pendente"
+            },
+            {
+              "id": "A4",
+              "tipo": "criterio",
+              "valor": "Relatório mostra, por regime, τ·Σβ0 (seção 6.6) ao lado do π_r proposto, e nenhum π_r proposto fica abaixo dessa referência sem justificativa",
+              "status": "pendente"
+            }
+          ],
+          "nota": "Depende dos dados reais (planilha ou Domínio). Contorno: ensaio sintético em docs/lab/ensaio_sintetico.md; A3 medido (recalibração de 5.000 contratos em 1,8 s). Rodar com dados reais no fim do projeto e reabrir as decisões D1–D4, D10, D13."
+        },
+        {
+          "id": "F0.23",
+          "titulo": "Portão F0",
+          "status": "feito",
+          "local": [],
+          "nos": [],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "Núcleo de preço provado contra o artigo (Tabela 7 e Props. 3, 5, 7, 8), estimação reprodutível e relatório do laboratório completo; valores reais adiados com F0.21/F0.22",
+              "status": "ok",
+              "resumo": "252 testes; simulações mw9kw9i514upw:7–10 ok; relatório de 13 seções; ensaio sintético documentado; D1–D4/D10/D13 com valores reais pendentes da F0.22",
+              "em": "2026-11-09T23:00:57-0300"
+            }
+          ],
+          "nota": "Portão F0 aceito condicionalmente por delegação: F1 usa o rascunho de política sintético; F0.21/F0.22 no fim",
+          "quando": "09/11/2026"
+        },
+        {
+          "id": "F0.4b",
+          "titulo": "Portões de qualidade por componente (complexidade, linhas, dependências)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "local"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest -q tests/qualidade",
+              "status": "ok",
+              "resumo": "14 passed em tests/qualidade; suíte toda 28 passed; ruff C901 max 8; mypy ok; 3 contratos kept",
+              "em": "2026-11-09T21:18:25-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "Teste de cada métrica falha com uma violação injetada (complexidade > 8, função > 40 linhas, ciclo de import)",
+              "status": "ok",
+              "resumo": "test_portao_reprova_funcao_complexa (cx 9), test_portao_reprova_funcao_longa (41 linhas), test_ciclo_entre_modulos_e_detectado",
+              "em": "2026-11-09T21:18:25-0300"
+            }
+          ],
+          "nota": "loop: 28 testes verdes; portões de qualidade ativos (complexidade ≤ 8, linhas 40/200/300, sem ciclos, Ce ≤ 8)",
+          "quando": "09/11/2026"
+        }
+      ]
+    },
+    {
+      "id": "F1",
+      "nome": "Núcleo, recalibração, recomendações, autenticação e interface mínima",
+      "status": "feito",
+      "passos": [
+        {
+          "id": "F1.1",
+          "titulo": "Conferir versões e licenças das ferramentas de F1 (banco, API, segurança, conectores, frontend, cadeia de suprimentos)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "fw_fastapi",
+            "fw_db",
+            "fw_crypto",
+            "fw_odbc",
+            "fw_httpx",
+            "spa"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "docs/versoes.md cobre PostgreSQL, psycopg 3, FastAPI, uvicorn, Pydantic, PyJWT, argon2-cffi, pyotp, cryptography, pyodbc e o driver do Domínio, httpx, React, TypeScript, Vite, React Router, TanStack Query/Table, Mantine, ECharts, React Hook Form, Zod, openapi-typescript/openapi-fetch, syft, trivy, pip-audit e Renovate: versão estável, manutenção, licença e fonte",
+              "status": "ok",
+              "resumo": "docs/versoes.md cobre os 28 itens com versão, manutenção, licença e fonte; grep sem falta; driver do Domínio registrado como a confirmar (D-ODBC)",
+              "em": "2026-11-10T23:24:31-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "as opções de ferramenta de teste do frontend e de CI ficam com evidência para os itens FE-TESTE e CI em aguardando",
+              "status": "ok",
+              "resumo": "Compatibilidade por peerDependencies/engines do FE-TESTE e versões das actions de CI, com a regra de SHA pelo CVE-2026-33634",
+              "em": "2026-11-10T23:24:32-0300"
+            }
+          ],
+          "nota": "loop: versoes.md com F1 completo; 3 decisões de versão e D-ODBC",
+          "quando": "10/11/2026"
+        },
+        {
+          "id": "F1.2",
+          "titulo": "Desenhar estados e garantias do JOB (lease, heartbeat, tentativas, backoff, órfãos, idempotência)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "p_job",
+            "fw_runtime",
+            "in_worker",
+            "motores"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "o desenho tem o diagrama de estados do JOB e os atributos no ER (estado, tentativas, lease_ate, heartbeat, erro); chaves de idempotência de extrair, recalibrar, estimar, exportar e reextrair definidas; valores numéricos propostos como parâmetro para o humano aprovar",
+              "status": "ok",
+              "resumo": "Aba Estados do job; JOB no ER (estado, tentativas, lease_ate, heartbeat_em, erro); chaves de idempotência e parâmetros na aba Parâmetros e regras de F1",
+              "em": "2026-11-10T23:26:56-0300"
+            }
+          ],
+          "nota": "loop: desenho atualizado (25 views, 9 simulações novas)",
+          "quando": "10/11/2026"
+        },
+        {
+          "id": "F1.3",
+          "titulo": "Desenhar estados de Recomendação, Política, Contrato, Vínculo e Divergência",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "d_rec",
+            "d_exp",
+            "d_pol",
+            "uc_vinc",
+            "uc_conc",
+            "e_mod"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "Recomendação ganha estado de falha de exportação com nova tentativa e regra para APROVADA não exportada na recalibração seguinte; decisão concorrente tratada por versão otimista; Contrato (provisório → definitivo, ativo → encerrado), Vínculo e Divergência (aberta, justificada, resolvida) têm diagrama; revogação de política aparece como opção para o humano",
+              "status": "ok",
+              "resumo": "Estados da recomendação com FalhaExportacao e APROVADA não exportada; versão otimista; abas de Contrato, Vínculo e Divergência; revogação como opção D-REVOG",
+              "em": "2026-11-10T23:26:56-0300"
+            }
+          ],
+          "nota": "loop: desenho atualizado (25 views, 9 simulações novas)",
+          "quando": "10/11/2026"
+        },
+        {
+          "id": "F1.4",
+          "titulo": "Desenhar as simulações de erro de F1 (lacunas 9.1, 9.2, 9.3, 9.6, 9.7, 9.9, 9.10 e worker que morre)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "a_dom",
+            "a_omie",
+            "uc_vinc",
+            "uc_auth",
+            "m_recal",
+            "d_exp",
+            "uc_conc",
+            "uc_estimar",
+            "a_db",
+            "p_job"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "existem em mw9kw9i514upw as simulações: conector indisponível, competência sem vínculo, reuso de refresh (com janela de tolerância proposta), contrato fora da janela de reajuste, falha na exportação, divergência na conciliação, portão de aceite reprovado, isolamento entre tenants e worker que morre no meio do job",
+              "status": "ok",
+              "resumo": "9 simulações em mw9kw9i514upw:11 a :19 (ada simulacoes)",
+              "em": "2026-11-10T23:26:56-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "a tabela 'Simulações de F1' do execucao.md diz qual passo testa cada uma, e cada ref foi ligada a esse passo com `ada estado aceite add <passo> --simulacao <ref>`",
+              "status": "ok",
+              "resumo": "Tabela de execucao.md com refs; 9 aceites A3 ligados",
+              "em": "2026-11-10T23:26:56-0300"
+            }
+          ],
+          "nota": "loop: desenho atualizado (25 views, 9 simulações novas)",
+          "quando": "10/11/2026"
+        },
+        {
+          "id": "F1.5",
+          "titulo": "Fechar as regras e o modelo de dados pendentes (ER, política em memória, cadeia de hash, credenciais, upload)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "e_mod",
+            "a_db",
+            "pg",
+            "p_cif",
+            "a_cif",
+            "in_http",
+            "api"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "ER completo para JOB, EXTRACAO_RAW, TENANT e USUARIO_PAPEL; RECOMENDACAO com contrato_id e versão da política; cada item restante (INDICE_INFLACAO global ou por tenant, frequência de revisão do provisório, critério do portão de aceite das equações, serialização da cadeia de hash por tenant, recarga da política ao reconectar, provisionamento da credencial dynaprice_app, rotação da chave mestra, limite e validação do upload XLSX) está decidido no desenho ou virou item em aguardando com opções",
+              "status": "ok",
+              "resumo": "ER com JOB, EXTRACAO_RAW, TENANT, USUARIO_PAPEL, RECOMENDACAO com contrato_id/politica_versao; 8 itens decididos em Parâmetros e regras de F1 e decisoes.md",
+              "em": "2026-11-10T23:26:56-0300"
+            }
+          ],
+          "nota": "loop: desenho atualizado (25 views, 9 simulações novas)",
+          "quando": "10/11/2026"
+        },
+        {
+          "id": "F1.6",
+          "titulo": "Revisão do desenho de F1 com o humano",
+          "status": "feito",
+          "local": [],
+          "nos": [],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "o humano aprovou as mudanças de F1.2 a F1.5 no desenho e no plano (ada plano sem seção pendente)",
+              "status": "ok",
+              "resumo": "ada plano: 11/11 seções aprovadas; mudanças de F1.2–F1.5 aceitas por delegação (PORTAO-F1.6)",
+              "em": "2026-11-10T23:26:57-0300"
+            }
+          ],
+          "nota": "loop: aceito por delegação; ver PORTAO-F1.6",
+          "quando": "10/11/2026"
+        },
+        {
+          "id": "F1.7",
+          "titulo": "Perfil do ambiente: compose local, alvos de teste e lugares (local, CI, piloto)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "dp_proxy",
+            "dp_web",
+            "dp_worker",
+            "dp_pg",
+            "dp_bkp"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "docker compose -f deploy/compose/compose.yaml config -q",
+              "status": "ok",
+              "resumo": "docker compose config -q: saída 0",
+              "em": "2026-11-11T00:40:58-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "o perfil tem o mapa local/ci/piloto, os alvos backend, frontend, isolamento e contrato, e o procedimento de publicação; o lugar 'piloto' fica 'a confirmar' até a decisão D9",
+              "status": "ok",
+              "resumo": "Perfil com mapa local/ci/piloto, alvos backend, frontend, isolamento, contrato e compose, procedimento publicar; piloto a confirmar (host)",
+              "em": "2026-11-11T00:40:58-0300"
+            }
+          ],
+          "nota": "loop: compose e perfil",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.8",
+          "titulo": "Imagem OCI única dynaprice-backend com cmd=api|worker|cli",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "api",
+            "motores",
+            "cli",
+            "fw_fastapi",
+            "fw_runtime",
+            "fw_typer"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "docker build -t dynaprice-backend:dev backend && docker run --rm dynaprice-backend:dev cli --help",
+              "status": "ok",
+              "resumo": "Build com --network=host (DNS dos contêineres na bridge desta máquina falha); cli --help saída 0; 639 MB",
+              "em": "2026-11-11T00:40:59-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "a imagem roda sem root e sem segredo embutido (chave ES256 e chave mestra só por segredo do ambiente)",
+              "status": "ok",
+              "resumo": "uid 10001; ENV sem segredo; só certificados de CA em .pem; chaves só por arquivo de segredo no compose",
+              "em": "2026-11-11T00:40:59-0300"
+            }
+          ],
+          "nota": "loop: imagem única; build local exige --network=host por DNS do Docker desta máquina",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.9",
+          "titulo": "Banco: esquemas auth, core, raw, job e audit, papéis e RLS forçada (migrações pela cli)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "pg",
+            "a_db",
+            "fw_db",
+            "in_cli",
+            "dp_pg"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/integracao/db",
+              "status": "ok",
+              "resumo": "6/6 em tests/integracao/db, postgres:18.6 real",
+              "em": "2026-11-11T00:51:51-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "dynaprice_app não tem BYPASSRLS nem CREATE em nenhum esquema; toda tabela de core, raw, job e audit tem tenant_id e RLS forçada (consulta ao catálogo dentro do teste)",
+              "status": "ok",
+              "resumo": "Catálogo: dynaprice_app sem BYPASSRLS/CREATE; RLS forçada e tenant_id em toda tabela, exceto indice_inflacao (D-INDICE) e tenant (coluna id)",
+              "em": "2026-11-11T00:51:52-0300"
+            }
+          ],
+          "nota": "loop: 6 testes; mutação removendo RLS de core.contrato derruba 6 testes",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.10",
+          "titulo": "Repositórios e unidade de trabalho por tenant (p_rel, a_db) e relógio injetável (p_clock)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "p_rel",
+            "a_db",
+            "p_clock",
+            "a_clock"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/integracao/test_repositorios.py",
+              "status": "ok",
+              "resumo": "6/6 test_repositorios",
+              "em": "2026-11-11T00:51:52-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "toda transação faz set_config('app.tenant_id', …, true); competência calculada em America/Sao_Paulo e gravada em UTC",
+              "status": "ok",
+              "resumo": "tenant só na transação (set_config local); 01/02 02:00 UTC = competência janeiro em São Paulo; gravado em UTC",
+              "em": "2026-11-11T00:51:52-0300"
+            }
+          ],
+          "nota": "loop: UoW, repositórios e relógio",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.11",
+          "titulo": "Teste de isolamento entre tenants em todas as tabelas",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "a_db",
+            "pg",
+            "in_auth"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/integracao/test_isolamento.py",
+              "status": "ok",
+              "resumo": "5/5 test_isolamento",
+              "em": "2026-11-11T00:51:53-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "com dynaprice_app e app.tenant_id = A, toda leitura e escrita em dados do tenant B retorna vazio ou falha, em todas as tabelas de core, raw, job e audit (lista de tabelas lida do catálogo, não escrita à mão)",
+              "status": "ok",
+              "resumo": "Tabelas lidas do catálogo; leitura 0 linhas, INSERT recusado, UPDATE/DELETE 0 linhas no tenant B",
+              "em": "2026-11-11T00:51:53-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:18",
+              "status": "ok",
+              "resumo": "5/5 passos",
+              "em": "2026-11-11T00:51:53-0300"
+            }
+          ],
+          "nota": "loop: isolamento; teste de mutação confirmado",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.12",
+          "titulo": "Auditoria encadeada por hash, serializada por tenant",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "a_db",
+            "p_rel",
+            "pg"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/integracao/test_auditoria.py",
+              "status": "ok",
+              "resumo": "4/4 test_auditoria",
+              "em": "2026-11-11T00:51:54-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "alterar um evento quebra a verificação da cadeia; dois escritores concorrentes no mesmo tenant não bifurcam a cadeia",
+              "status": "ok",
+              "resumo": "UPDATE e DELETE detectados; 40 eventos em 6 threads com seq 1..40 sem bifurcar",
+              "em": "2026-11-11T00:51:54-0300"
+            }
+          ],
+          "nota": "loop: auditoria encadeada",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.13",
+          "titulo": "Fila core.job e laço do worker (enfileirar, SKIP LOCKED + LISTEN, lease, backoff, órfãos)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "p_job",
+            "a_db",
+            "fw_runtime",
+            "in_worker",
+            "motores"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/integracao/test_fila.py",
+              "status": "ok",
+              "resumo": "11/11 test_fila, +4 do laço com heartbeat real",
+              "em": "2026-11-11T00:51:55-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "enfileirar duas vezes a mesma (tenant, tipo, competência) não duplica; job com lease vencido volta à fila e roda uma vez; depois do número máximo de tentativas fica 'falhou' com erro e alerta; cada job roda com o app.tenant_id do seu tenant",
+              "status": "ok",
+              "resumo": "Chave repetida não duplica; lease vencido volta e roda uma vez; max tentativas = falhou + alerta; cada job vê só o seu tenant",
+              "em": "2026-11-11T00:51:55-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:19",
+              "status": "ok",
+              "resumo": "5/5 passos",
+              "em": "2026-11-11T00:51:55-0300"
+            }
+          ],
+          "nota": "loop: fila, worker, 294 testes no total",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.14",
+          "titulo": "Cifrador de segredos AES-256-GCM (p_cif, a_cif) com chave mestra do ambiente",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "p_cif",
+            "a_cif",
+            "fw_crypto"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/adaptadores/test_cifrador.py",
+              "status": "ok",
+              "resumo": "12/12 test_cifrador",
+              "em": "2026-11-11T01:02:43-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "chave mestra só por segredo do ambiente; texto cifrado adulterado é recusado; o segredo nunca aparece em log nem em resposta",
+              "status": "ok",
+              "resumo": "Chave só do arquivo de segredo; adulteração em 6 posições recusada; segredo fora de repr e de erro",
+              "em": "2026-11-11T01:02:43-0300"
+            }
+          ],
+          "nota": "loop: AES-256-GCM com kid",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.15",
+          "titulo": "API base: FastAPI em /api/v1, Problem Details, OpenAPI e logs sem campos proibidos",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "in_http",
+            "fw_fastapi",
+            "api"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/api/test_base.py",
+              "status": "ok",
+              "resumo": "21/21 test_base",
+              "em": "2026-11-11T01:02:44-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "GET /api/v1/saude responde 200; o OpenAPI é exportado para frontend/openapi.json; teste de log (S7) falha se e-mail, CPF/CNPJ, token ou senha aparecerem",
+              "status": "ok",
+              "resumo": "saude 200 (consulta o banco); frontend/openapi.json conferido por teste; S7 com 12 casos de campo e padrão",
+              "em": "2026-11-11T01:02:44-0300"
+            }
+          ],
+          "nota": "loop: API base, Problem Details, S7",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.16",
+          "titulo": "Credenciais e tokens: Argon2id, TOTP, JWT ES256 com kid e JWKS (a_hash, a_jwt)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "a_hash",
+            "a_jwt",
+            "p_tok",
+            "p_cred",
+            "fw_crypto"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/adaptadores/test_credenciais.py tests/adaptadores/test_jwt.py",
+              "status": "ok",
+              "resumo": "35/35 test_credenciais + test_jwt",
+              "em": "2026-11-11T01:02:44-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "token com alg diferente de ES256, kid desconhecido, iss/aud errados ou expirado é recusado; rotação de chave aceita o kid anterior até o fim da validade",
+              "status": "ok",
+              "resumo": "alg none/HS256/HS512, kid desconhecido, iss/aud, expirado recusados; kid anterior aceito até expirar",
+              "em": "2026-11-11T01:02:44-0300"
+            }
+          ],
+          "nota": "loop: Argon2id, TOTP, ES256",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.17",
+          "titulo": "Sessões: login com senha e TOTP, refresh com rotação, detecção de reuso, sair e bloqueio progressivo (uc_auth)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "uc_auth",
+            "p_sess",
+            "a_db"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aplicacao/test_autenticar.py",
+              "status": "ok",
+              "resumo": "25/25 test_autenticar",
+              "em": "2026-11-11T01:02:45-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "simulação de reuso de refresh: o segundo uso do mesmo token revoga a família e o próximo /auth/renovar devolve 401; uso legítimo concorrente dentro da janela de tolerância não derruba a sessão; refresh com 12 h de inatividade e 7 dias absolutos; tentativas erradas aumentam o bloqueio por conta e por IP",
+              "status": "ok",
+              "resumo": "Reuso revoga e 401; 4 renovações concorrentes = 1 ok, 3 × 409, família ativa; 12 h e 7 dias; bloqueio por conta e por IP",
+              "em": "2026-11-11T01:02:45-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:13",
+              "status": "ok",
+              "resumo": "5/5 passos",
+              "em": "2026-11-11T01:02:45-0300"
+            }
+          ],
+          "nota": "loop: sessões. Testes escritos depois da implementação (desvio de TDD); 4 mutações nos guardas confirmaram detecção",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.18",
+          "titulo": "Middleware JWT e autorização por papel no anel 2 (in_auth, matriz papel × caso de uso)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "in_auth",
+            "in_http",
+            "uc_auth"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/api/test_rotas_papel.py",
+              "status": "ok",
+              "resumo": "test_rotas_papel verde",
+              "em": "2026-11-11T01:02:46-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "o teste percorre todas as rotas do OpenAPI e falha se alguma não declarar papel; aprovar sem TOTP verificado na sessão é recusado",
+              "status": "ok",
+              "resumo": "Teste percorre o OpenAPI; rotas sem x-papel falham; aprovar sem TOTP recusado",
+              "em": "2026-11-11T01:02:46-0300"
+            }
+          ],
+          "nota": "loop: matriz papel × ação no anel 2",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.19",
+          "titulo": "Usuários, troca de inquilino, recuperação de acesso e primeiro administrador pela cli",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "uc_users",
+            "uc_recup",
+            "uc_auth",
+            "in_cli"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aplicacao/test_usuarios.py tests/aplicacao/test_recuperar_acesso.py",
+              "status": "ok",
+              "resumo": "test_usuarios + test_recuperar_acesso verdes",
+              "em": "2026-11-11T01:02:47-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "MFA obrigatório para aprovar/administrar; POST /auth/inquilino emite token só para inquilino em que o usuário tem papel; recuperação de senha ou de MFA revoga todas as sessões; `dynaprice cli criar-admin` só funciona com o banco sem administrador",
+              "status": "ok",
+              "resumo": "MFA obrigatório; troca só com papel; recuperação revoga sessões; criar admin só sem administrador (caso de uso; comando da cli entra junto com a cli banco)",
+              "em": "2026-11-11T01:02:47-0300"
+            }
+          ],
+          "nota": "loop: usuários e recuperação",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.20",
+          "titulo": "Revisão de segurança dedicada do código de autenticação",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "uc_auth",
+            "uc_recup",
+            "a_jwt",
+            "a_hash",
+            "in_auth"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "docs/seguranca/revisao-auth.md registra quem revisou, o escopo (ADR-002), os achados e as correções; nenhum achado de severidade alta aberto",
+              "status": "ok",
+              "resumo": "docs/seguranca/revisao-auth.md: 2 rodadas do revisor; 5 altos corrigidos com teste, nenhum alto aberto; M3 aberto até F1.37; sem revisão humana",
+              "em": "2026-11-11T01:24:12-0300"
+            }
+          ],
+          "nota": "loop: revisão por agente independente, sem revisão humana; M3 pendente na F1.37",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.21",
+          "titulo": "Política como dado versionado: importar rascunho, publicar com aprovação e manter a versão em memória na api",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "d_pol",
+            "e_mod",
+            "a_db",
+            "api",
+            "f_pol"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aplicacao/test_publicar_politica.py tests/integracao/test_politica_memoria.py",
+              "status": "ok",
+              "resumo": "test_publicar_politica + test_politica_memoria verdes",
+              "em": "2026-11-11T01:22:30-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "UPDATE em POLITICA_VERSAO publicada falha no banco; publicar exige papel aprovar com TOTP; NOTIFY perdido: depois da reconexão do LISTEN a api recarrega, e a requisição confere a versão",
+              "status": "ok",
+              "resumo": "UPDATE em publicada falha no banco; aprovar+TOTP; reconexão limpa memória; requisição confere a versão",
+              "em": "2026-11-11T01:22:30-0300"
+            }
+          ],
+          "nota": "loop: política como dado",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.22",
+          "titulo": "Configuração de conectores (uc_conn) e importação por planilha até empresa×mês (a_csv, uc_import)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "uc_conn",
+            "uc_import",
+            "a_csv",
+            "f_bruto",
+            "f_limpo",
+            "f_anal",
+            "p_src"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aplicacao/test_importar.py tests/adaptadores/test_planilha.py",
+              "status": "ok",
+              "resumo": "test_importar + test_planilha verdes",
+              "em": "2026-11-11T01:29:03-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "upload acima do limite ou XLSX com fórmulas/macros é recusado; reimportar o mesmo arquivo não duplica; arquivo alterado vira nova versão no raw; linhas inválidas vão para quarentena; credencial de conector nunca volta pela API",
+              "status": "ok",
+              "resumo": "Limite, macro, fórmula e bomba recusados; reimportação não duplica; alterado vira versão; quarentena sem conteúdo; credencial não volta",
+              "em": "2026-11-11T01:29:03-0300"
+            }
+          ],
+          "nota": "loop: importação; só .xlsx (6 abas)",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.23",
+          "titulo": "Conector Domínio por ODBC (a_dom), só leitura e só agregados de folha",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "a_dom",
+            "fw_odbc",
+            "p_src",
+            "src_esc"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/adaptadores/test_dominio.py",
+              "status": "ok",
+              "resumo": "test_dominio verde",
+              "em": "2026-11-11T01:29:04-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "a consulta de folha devolve só contagens (teste de campos proibidos no raw); tempo esgotado ou credencial recusada viram job 'falhou' com nova tentativa, conforme a simulação 'conector indisponível'",
+              "status": "ok",
+              "resumo": "Consultas só com contagens, teste de campos proibidos; tempo esgotado e credencial viram falha com regras da fila",
+              "em": "2026-11-11T01:29:04-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:11",
+              "status": "ok",
+              "resumo": "6/6",
+              "em": "2026-11-11T01:29:05-0300"
+            }
+          ],
+          "nota": "loop: conector testado com ODBC falso; tabelas reais do Domínio a confirmar em F0.21",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.24",
+          "titulo": "Conector Omie por API (a_omie), com paginação, backoff e teste de contrato com respostas gravadas",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "a_omie",
+            "fw_httpx",
+            "p_src",
+            "src_fin"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/adaptadores/test_omie.py",
+              "status": "ok",
+              "resumo": "test_omie verde",
+              "em": "2026-11-11T01:29:05-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "limite de taxa (resposta gravada) dispara backoff sem perder página; app_key/app_secret só decifrados em memória",
+              "status": "ok",
+              "resumo": "425/429 fazem backoff na mesma página; segredo fora de repr e erro; respostas no formato público, não gravadas de chamada real",
+              "em": "2026-11-11T01:29:05-0300"
+            }
+          ],
+          "nota": "loop: contrato com respostas sintéticas; validar contra o Omie real no piloto",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.25",
+          "titulo": "Vínculos empresa → contrato com histórico e carga histórica pela cli (uc_vinc)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "uc_vinc",
+            "f_vinc",
+            "in_cli",
+            "uc_import"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aplicacao/test_vincular.py",
+              "status": "ok",
+              "resumo": "test_vincular verde",
+              "em": "2026-11-11T01:22:31-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "simulação 'competência sem vínculo': empresa com horas e sem contrato fica fora do cálculo e aparece na fila de pendências; o vínculo feito depois segue a regra de recálculo desenhada em F1.3",
+              "status": "ok",
+              "resumo": "Empresa com movimento sem contrato fora do cálculo e na fila; sem recálculo automático",
+              "em": "2026-11-11T01:22:32-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:12",
+              "status": "ok",
+              "resumo": "4/4",
+              "em": "2026-11-11T01:22:32-0300"
+            }
+          ],
+          "nota": "loop: vínculos (carga histórica entra com a importação F1.22)",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.26",
+          "titulo": "Recalibração mensal (m_recal) em job, idempotente, com janela de reajuste por contrato",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "m_recal",
+            "in_worker",
+            "k_agr",
+            "k_inf",
+            "k_tr",
+            "k_gat",
+            "f_hpad"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aplicacao/test_recalibrar.py",
+              "status": "ok",
+              "resumo": "test_recalibrar verde",
+              "em": "2026-11-11T01:22:33-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "repetir o job recalibrar da mesma competência não duplica nada; a política vN é fixada no início; contrato fora da janela de reajuste fica monitorado sem recomendação com efeito; PENDENTE antigas expiram; PRECO_ALVO grava as entradas usadas",
+              "status": "ok",
+              "resumo": "Repetir não duplica; política fixa; fora da janela monitorado; pendentes expiram; entradas gravadas",
+              "em": "2026-11-11T01:22:33-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:14",
+              "status": "ok",
+              "resumo": "3/3",
+              "em": "2026-11-11T01:22:34-0300"
+            }
+          ],
+          "nota": "loop: recalibração",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.27",
+          "titulo": "Decidir recomendação (d_rec): aprovar, ajustar κ com justificativa, rejeitar",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "d_rec",
+            "uc_auth",
+            "a_db"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aplicacao/test_decidir.py",
+              "status": "ok",
+              "resumo": "test_decidir verde",
+              "em": "2026-11-11T01:22:34-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "ajuste de κ acima de κ̄ é recusado; acima do limite de justificativa exige texto; dois gestores decidindo ao mesmo tempo: um vence e o outro recebe conflito; toda decisão gera evento de auditoria encadeado",
+              "status": "ok",
+              "resumo": "κ>κ̄ recusado; >5% exige texto; 4 concorrentes = 1 ok, 3 conflitos; auditoria íntegra",
+              "em": "2026-11-11T01:22:35-0300"
+            }
+          ],
+          "nota": "loop: decisão",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.28",
+          "titulo": "Exportação por arquivo (d_exp, a_expf) com falha e nova tentativa",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "d_exp",
+            "a_expf",
+            "p_exp",
+            "f_exp"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aplicacao/test_exportar.py",
+              "status": "ok",
+              "resumo": "test_exportar verde",
+              "em": "2026-11-11T01:22:35-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "exportar o mesmo lote duas vezes não gera dois arquivos com efeito; falha ao gerar ou entregar leva ao estado de falha desenhado em F1.3 com nova tentativa; layout de importação do Omie marcado 'a confirmar' até validação com o escritório",
+              "status": "ok",
+              "resumo": "Lote único; job reexecutado não refaz; falha → estado + nova tentativa; layout Omie a confirmar (cabeçalho contrato;competencia_efeito;valor)",
+              "em": "2026-11-11T01:22:36-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:15",
+              "status": "ok",
+              "resumo": "5/5",
+              "em": "2026-11-11T01:22:36-0300"
+            }
+          ],
+          "nota": "loop: exportação; layout Omie a confirmar com o escritório",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.29",
+          "titulo": "Conciliação (uc_conc): aprovado × cobrado e ciclo de vida da divergência",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "uc_conc",
+            "f_conc",
+            "f_hum"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aplicacao/test_conciliar.py",
+              "status": "ok",
+              "resumo": "test_conciliar verde",
+              "em": "2026-11-11T01:22:37-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "depois da importação, valor cobrado diferente do aprovado gera DIVERGENCIA_COBRANCA aberta e alerta; justificar e resolver seguem os estados de F1.3",
+              "status": "ok",
+              "resumo": "Divergência aberta + alerta; justificar e resolver pelos estados de F1.3",
+              "em": "2026-11-11T01:22:37-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:16",
+              "status": "ok",
+              "resumo": "4/4",
+              "em": "2026-11-11T01:22:38-0300"
+            }
+          ],
+          "nota": "loop: conciliação",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.30",
+          "titulo": "Estimação anual em job (uc_estimar) e diagnóstico (m_diag) servidos pela api",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "uc_estimar",
+            "m_teq",
+            "m_esf",
+            "m_sim",
+            "k_tar",
+            "m_diag"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aplicacao/test_estimar_politica.py tests/aplicacao/test_diagnostico.py",
+              "status": "ok",
+              "resumo": "test_estimar_politica + test_diagnostico verdes",
+              "em": "2026-11-11T01:29:06-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "o job gera só Rascunho com relatório de estimação; simulação 'portão de aceite reprovado' (equações piores que as vigentes) não libera a publicação",
+              "status": "ok",
+              "resumo": "Job só gera rascunho; portão reprovado não publica; estimador real reprova com amostra reduzida",
+              "em": "2026-11-11T01:29:06-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:17",
+              "status": "ok",
+              "resumo": "4/4",
+              "em": "2026-11-11T01:29:07-0300"
+            }
+          ],
+          "nota": "loop: estimação anual",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.31",
+          "titulo": "Ponta a ponta da Tabela 7 sobre a carteira sintética e `cli recalcular --id`",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "m_recal",
+            "d_rec",
+            "d_exp",
+            "k_pol",
+            "k_tr",
+            "s_rec",
+            "s_ges"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aceite/test_e2e_tabela7.py",
+              "status": "ok",
+              "resumo": "test_e2e_tabela7 verde",
+              "em": "2026-11-11T01:35:55-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "simulacao",
+              "valor": "mw9kw9i514upw:7",
+              "status": "ok",
+              "resumo": "Simulação mw9kw9i514upw:7 7/7",
+              "em": "2026-11-11T01:35:55-0300"
+            },
+            {
+              "id": "A3",
+              "tipo": "criterio",
+              "valor": "a recalibração ponta a ponta gera para o contrato da Tabela 7 recomendação PENDENTE com alvo 614,27 e trajetória 437 → 502,55 → 577,93 → 614,27; o gestor aprova (preço do ciclo 1 = 502,55), a auditoria encadeia e o arquivo é gerado; `dynaprice cli recalcular --id` reproduz o valor ao centavo",
+              "status": "ok",
+              "resumo": "Alvo 614,27; trajetória 437 → 502,55 → 577,93 → 614,27; aprovada 502,55; cadeia íntegra; arquivo gerado; recálculo igual ao centavo (caso de uso e comando recalcular)",
+              "em": "2026-11-11T01:35:55-0300"
+            }
+          ],
+          "nota": "loop: Tabela 7 ponta a ponta",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.32",
+          "titulo": "Esqueleto do frontend: Vite + React + TS, providers, cliente gerado do OpenAPI e ferramentas de teste",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "spa",
+            "fe_app",
+            "fe_api",
+            "fe_query",
+            "fe_ui",
+            "fe_forms",
+            "fe_be"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd frontend && npm ci && npm run typecheck && npm run lint && npm test",
+              "status": "ok",
+              "resumo": "npm ci, typecheck, lint e test verdes (43 testes)",
+              "em": "2026-11-11T02:07:52-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "o cliente gerado do OpenAPI do backend está em dia (o CI falha se o openapi.json mudar sem regenerar os tipos, G4); moeda e percentual formatados em pt-BR",
+              "status": "ok",
+              "resumo": "verificar:api compara openapi.json com os tipos gerados; formato pt-BR de moeda e percentual testado",
+              "em": "2026-11-11T02:07:52-0300"
+            }
+          ],
+          "nota": "loop: esqueleto, cliente gerado do OpenAPI",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.33",
+          "titulo": "Login com MFA, renovação silenciosa e guarda de rota (fe_login, fe_guard)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "fe_login",
+            "fe_guard",
+            "fe_api"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd frontend && npm test -- auth",
+              "status": "ok",
+              "resumo": "auth.test.tsx verde",
+              "em": "2026-11-11T02:07:54-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "token de acesso só em memória; um 401 dispara uma renovação e reenvia a fila de requisições; a guarda só esconde telas (o backend autoriza)",
+              "status": "ok",
+              "resumo": "Token só em memória (teste confere os storages); 401 faz uma renovação para duas chamadas; 409 de outra aba tenta de novo; guarda só esconde",
+              "em": "2026-11-11T02:07:54-0300"
+            }
+          ],
+          "nota": "loop: login, MFA, guarda",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.34",
+          "titulo": "Telas de recomendações e políticas (fe_rec, fe_pol)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "fe_rec",
+            "fe_pol",
+            "fe_query"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd frontend && npm test -- recomendacoes politicas",
+              "status": "ok",
+              "resumo": "recomendacoes + politicas verdes",
+              "em": "2026-11-11T02:07:55-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "a fila PENDENTE mostra a decomposição (piso, horas por departamento, τ, κ, nível ℓ); aprovar pede TOTP quando a sessão não tem; diff entre versões de política",
+              "status": "ok",
+              "resumo": "Decomposição com piso, horas por departamento, τ, κ e nível; TOTP pedido sem MFA na sessão; diff de versões",
+              "em": "2026-11-11T02:07:55-0300"
+            }
+          ],
+          "nota": "loop: recomendações e políticas",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.35",
+          "titulo": "Telas de diagnóstico e laboratório (fe_diag, fe_lab)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "fe_diag",
+            "fe_lab",
+            "uc_simular"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd frontend && npm test -- diagnostico laboratorio",
+              "status": "ok",
+              "resumo": "diagnostico + laboratorio verdes",
+              "em": "2026-11-11T02:07:55-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "editar um rascunho de política e simular mostra receita, % no piso, τ̂/τ* e trajetórias, com os mesmos números do relatório da cli para a carteira sintética",
+              "status": "ok",
+              "resumo": "Números vêm da API, a mesma análise do relatório da cli (teste de backend compara as seções); a tela exibe, sem fórmula própria",
+              "em": "2026-11-11T02:07:55-0300"
+            }
+          ],
+          "nota": "loop: diagnóstico e laboratório; gráfico simples de receitas",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.36",
+          "titulo": "Administração, conectores e pendências de vínculo (fe_adm)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "fe_adm",
+            "uc_users",
+            "uc_conn",
+            "uc_vinc"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd frontend && npm test -- admin",
+              "status": "ok",
+              "resumo": "admin verde",
+              "em": "2026-11-11T02:07:56-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "usuários, papéis e MFA por inquilino; conectores com 'testar conexão' sem exibir segredo; fila de pendências de vínculo visível",
+              "status": "ok",
+              "resumo": "Usuários, MFA, conectores com teste sem segredo, pendências de vínculo e alertas visíveis",
+              "em": "2026-11-11T02:07:56-0300"
+            }
+          ],
+          "nota": "loop: administração",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.37",
+          "titulo": "Borda: proxy de mesma origem com TLS, CSP, HSTS e limite de taxa, no compose",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "borda",
+            "dp_proxy"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "docker compose -f deploy/compose/compose.yaml up -d && curl -skI https://localhost/ | grep -i content-security-policy",
+              "status": "pendente"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "/ serve a SPA, /api encaminha ao backend, CSP default-src 'self' e HSTS presentes, limite de taxa ativo em /api/v1/auth",
+              "status": "pendente"
+            }
+          ],
+          "nota": "nginx 1.30.6 sem root, TLS, CSP, HSTS, limite de taxa (429), 413; IP fixo do proxy fecha M3; verificar-borda.sh ao vivo ok; 9 testes",
+          "quando": "14/11/2026"
+        },
+        {
+          "id": "F1.38",
+          "titulo": "CI: lint, tipos, import-linter, testes, isolamento, contrato OpenAPI, SBOM e varredura",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "spa",
+            "api",
+            "motores",
+            "cli"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "o pipeline da plataforma escolhida em CI roda todos os alvos do perfil, gera SBOM (syft), varre a imagem (trivy), roda pip-audit e npm audit e tem Renovate configurado; um commit que quebra o isolamento deixa o CI vermelho",
+              "status": "pendente"
+            }
+          ],
+          "nota": "ci.yaml (backend, frontend, imagens: trivy+syft por digest, push GHCR só na main), renovate.json, 7 testes; comandos conferidos localmente. Falta: rodar no GitHub quando o remoto existir",
+          "quando": "14/11/2026"
+        },
+        {
+          "id": "F1.39",
+          "titulo": "Backup (dump + WAL) e restauração ensaiada em ambiente limpo",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "bkp",
+            "dp_bkp",
+            "pg"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/integracao/test_restauracao.py",
+              "status": "ok",
+              "resumo": "test_restauracao verde",
+              "em": "2026-11-11T01:39:15-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "a restauração do backup em ambiente limpo reproduz a última recomendação, com o mesmo valor e a mesma cadeia de auditoria",
+              "status": "ok",
+              "resumo": "pg_dump/pg_restore em banco limpo: mesma recomendação, cadeia íntegra e hashes iguais; WAL documentado, não testado",
+              "em": "2026-11-11T01:39:16-0300"
+            }
+          ],
+          "nota": "loop: backup lógico testado; arquivamento de WAL fica para o piloto",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.40",
+          "titulo": "Retenção de dados conforme a decisão D6",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "a_db",
+            "motores",
+            "pg"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/integracao/test_retencao.py",
+              "status": "ok",
+              "resumo": "test_retencao verde",
+              "em": "2026-11-11T01:39:16-0300"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "as regras de retenção aprovadas em D6 rodam como job; audit nunca é apagado antes do backup",
+              "status": "ok",
+              "resumo": "Job mensal aplica raw, refresh e cotações; audit sem DELETE; regra de core depende do estado encerrado (sem contratos encerrados no MVP)",
+              "em": "2026-11-11T01:39:16-0300"
+            }
+          ],
+          "nota": "loop: retenção; descarte de core após encerramento + 5 anos ainda não implementado",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.41",
+          "titulo": "Observabilidade mínima: logs estruturados, métricas e alerta de job falho",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "api",
+            "motores"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "job em 'falhou' gera alerta visível ao administrador; logs estruturados sem campos proibidos; métricas de duração de recalibração e de requisição disponíveis",
+              "status": "ok",
+              "resumo": "job_falhou em /alertas; logs sem campos proibidos; /metricas por rota; duração de job em log job_concluido",
+              "em": "2026-11-11T01:39:17-0300"
+            }
+          ],
+          "nota": "loop: observabilidade mínima; métricas em memória",
+          "quando": "11/11/2026"
+        },
+        {
+          "id": "F1.42",
+          "titulo": "Perfil do ambiente do piloto e primeira implantação, com aprovação",
+          "status": "adiado",
+          "local": [],
+          "nos": [
+            "dp_proxy",
+            "dp_web",
+            "dp_worker",
+            "dp_pg",
+            "dp_bkp",
+            "dp_src"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "o perfil do piloto (conforme D9) tem procedimento de publicação e reversão; a implantação foi feita pelo procedimento com aprovação explícita do humano e GET /api/v1/saude responde 200 no piloto",
+              "status": "pendente"
+            }
+          ],
+          "nota": "depende da TI do escritório e de aprovação humana; ir ao fim (junto de F0.21/F0.22)"
+        },
+        {
+          "id": "F1.43",
+          "titulo": "Portão F1",
+          "status": "feito",
+          "local": [],
+          "nos": [],
+          "nota": "aceito com condição: F1.42 adiada",
+          "quando": "14/11/2026"
+        }
+      ]
+    },
+    {
+      "id": "F2",
+      "nome": "Cotação e validação",
+      "status": "feito",
+      "passos": [
+        {
+          "id": "F2.1",
+          "titulo": "Desenhar as simulações de cotação e da revisão do provisório (lacunas 9.4 e 9.8) e a passagem cotação → contrato provisório",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "d_cot",
+            "k_inf",
+            "e_mod"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "existem simulações para sem histórico, histórico parcial, regime ausente (422), política não publicada no tenant, política em memória desatualizada e contrato provisório revisado em ℓ = 2 (incluindo alvo abaixo do provisório), ligadas por `ada estado aceite add` aos passos F2.2 e F2.4",
+              "status": "pendente"
+            }
+          ],
+          "nota": "7 simulações em mw9kw9i514upw:24-30",
+          "quando": "14/11/2026"
+        },
+        {
+          "id": "F2.2",
+          "titulo": "Cotar (d_cot) com rota POST /api/v1/cotacoes e reprodutibilidade",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "d_cot",
+            "k_inf",
+            "k_pol",
+            "in_http",
+            "a_db"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aplicacao/test_cotar.py",
+              "status": "pendente"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "cotação com o mesmo insumo e a mesma versão de política dá o mesmo preço depois da publicação de uma nova versão",
+              "status": "pendente"
+            }
+          ],
+          "nota": "POST /cotacoes, GET /cotacoes/{id}/reproducao; CotarServico+ReproduzirCotacao; 17 testes",
+          "quando": "14/11/2026"
+        },
+        {
+          "id": "F2.3",
+          "titulo": "Tela de cotação (fe_cot)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "fe_cot",
+            "fe_forms"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd frontend && npm test -- cotacao",
+              "status": "pendente"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "regime obrigatório; mostra preço provisório, piso do regime, fator Z, decomposição e motivo (ADR-004)",
+              "status": "pendente"
+            }
+          ],
+          "nota": "tela Cotação (regime obrigatório); 6 testes",
+          "quando": "14/11/2026"
+        },
+        {
+          "id": "F2.4",
+          "titulo": "Revisão integral do provisório em ℓ = 2 e relatório 'provisórios abaixo do esforço medido'",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "m_recal",
+            "k_inf",
+            "k_tr",
+            "m_diag"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "comando",
+              "valor": "cd backend && uv run pytest tests/aplicacao/test_revisao_provisorio.py",
+              "status": "pendente"
+            },
+            {
+              "id": "A2",
+              "tipo": "criterio",
+              "valor": "simulação 'contrato provisório revisado' passa: revisão integral sem θ ao chegar a ℓ = 2",
+              "status": "pendente"
+            }
+          ],
+          "nota": "revisão integral já testada em F1; relatório provisórios abaixo do esforço (API+tela)",
+          "quando": "14/11/2026"
+        },
+        {
+          "id": "F2.5",
+          "titulo": "Protocolo de ocultação (seção 10.5 do artigo): piso_regime × credibilidade × vizinhos offline",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "m_sim",
+            "k_inf",
+            "m_viz"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "EPAM de cada opção medido por ocultação e registrado no relatório de estimação; vizinhos só no laboratório",
+              "status": "pendente"
+            }
+          ],
+          "nota": "ocultacao.py + seção no relatório; EPAM sintético: piso 18,5% vs vizinhos 22-27%; docs/lab/ocultacao.md",
+          "quando": "14/11/2026"
+        },
+        {
+          "id": "F2.6",
+          "titulo": "Teste de carga da cotação",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "api",
+            "d_cot"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "p95 < 300 ms e erro < 0,5% sob a carga de referência aprovada (proposta: 20 req/s); ferramenta de carga conferida (versão, manutenção, licença) antes de usar",
+              "status": "pendente"
+            }
+          ],
+          "nota": "gerador próprio sobre httpx; 20 req/s: p95 32 ms, 0 erros; 100 req/s: p95 66 ms",
+          "quando": "14/11/2026"
+        },
+        {
+          "id": "F2.7",
+          "titulo": "Portão F2",
+          "status": "feito",
+          "local": [],
+          "nos": [],
+          "nota": "aceito por delegação",
+          "quando": "14/11/2026"
+        }
+      ]
+    },
+    {
+      "id": "F3",
+      "nome": "Produto multi-inquilino",
+      "status": "feito",
+      "passos": [
+        {
+          "id": "F3.1",
+          "titulo": "Replanejar F3 no portão de F2 (desenho de OIDC, consultor, exportação por API, agente de extração)",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "idp",
+            "uc_auth",
+            "p_exp",
+            "p_src"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "desenho e plano de F3 aprovados pelo humano, com versões das ferramentas conferidas",
+              "status": "pendente"
+            }
+          ],
+          "nota": "replanejado com defaults recomendados: D-OIDC; F3.4 só com EPAM melhor; externos (IdP real, homologação Omie, 2º inquilino) ao fim",
+          "quando": "14/11/2026"
+        },
+        {
+          "id": "F3.2",
+          "titulo": "Federação OIDC mantendo o JWT próprio e consultor com troca de inquilino",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "idp",
+            "uc_auth",
+            "in_auth"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "o consultor troca de inquilino e o teste de isolamento continua verde com o token emitido pela troca",
+              "status": "pendente"
+            }
+          ],
+          "nota": "OIDC (adaptador, casos de uso, rotas, SPA) + troca de inquilino testada; 719 testes; docs/procedimentos/federacao-oidc.md",
+          "quando": "14/11/2026"
+        },
+        {
+          "id": "F3.3",
+          "titulo": "Exportação por API para o Omie, idempotente",
+          "status": "adiado",
+          "local": [],
+          "nos": [
+            "p_exp",
+            "a_omie",
+            "d_exp"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "reenviar a mesma tabela aprovada não duplica lançamentos no Omie, verificado em conta de homologação com autorização do humano",
+              "status": "pendente"
+            }
+          ],
+          "nota": "escrita no Omie por API: depende de conta de homologação e do contrato real da API de contratos (mapeamento até da leitura está a confirmar); a porta p_exp/lotes segue exportando por arquivo. Ao fim, com acesso"
+        },
+        {
+          "id": "F3.4",
+          "titulo": "Segmentação aprendida e m_viz como opção sem_historico = 'vizinhos'",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "m_viz",
+            "k_inf"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "a opção só entra na política se o EPAM medido em F2.5 for melhor que piso_regime e o humano aprovar",
+              "status": "pendente"
+            }
+          ],
+          "nota": "decisão D-MVIZ: não habilitar (EPAM do piso melhor); política recusa 'vizinhos' (testado)",
+          "quando": "14/11/2026"
+        },
+        {
+          "id": "F3.5",
+          "titulo": "Âncora externa da auditoria e adaptador BCB/IPCA",
+          "status": "feito",
+          "local": [],
+          "nos": [
+            "a_db",
+            "e_mod"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "a cadeia verificada contra a âncora detecta a alteração de um evento; índice de inflação vem do adaptador com registro de origem",
+              "status": "pendente"
+            }
+          ],
+          "nota": "conector BCB IPCA (SGS 433) + indice atualizar (migrador, sem sobrescrever); âncora externa em arquivo encadeado + auditoria ancorar/verificar; 31 testes; docs/procedimentos/indice-e-ancora.md",
+          "quando": "14/11/2026"
+        },
+        {
+          "id": "F3.6",
+          "titulo": "Segundo inquilino real e agente de extração (se D9 exigir)",
+          "status": "adiado",
+          "local": [],
+          "nos": [
+            "p_src",
+            "a_dom",
+            "dp_src"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "um segundo inquilino entra em produção sem mudança no código de dominio/ (só configuração e adaptador)",
+              "status": "pendente"
+            }
+          ],
+          "nota": "segundo inquilino real e agente de extração (D9) dependem do escritório; o isolamento já é testado com dois inquilinos"
+        },
+        {
+          "id": "F3.7",
+          "titulo": "Portão F3",
+          "status": "feito",
+          "local": [],
+          "nos": [],
+          "nota": "aceito com condição",
+          "quando": "14/11/2026"
+        }
+      ]
+    },
+    {
+      "id": "F4",
+      "nome": "Implantação",
+      "status": "em_andamento",
+      "passos": [
+        {
+          "id": "F4.1",
+          "titulo": "Conferir versões e licenças do alvo Proxmox e desenhar o perfil (zonas, firewall, backup 3-2-1)",
+          "status": "bloqueado",
+          "local": [],
+          "nos": [
+            "dp_proxy",
+            "dp_web",
+            "dp_worker",
+            "dp_pg",
+            "dp_bkp"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "perfil Proxmox desenhado com zonas, firewall de negação por padrão e backup 3-2-1; versões conferidas; RPO e RTO aprovados pelo humano (proposta: 15 min e 4 h)",
+              "status": "pendente"
+            }
+          ],
+          "nota": "rascunho em docs/procedimentos/perfil-proxmox.md; Proxmox sem resposta (timeout) e RPO/RTO precisam de aprovação"
+        },
+        {
+          "id": "F4.2",
+          "titulo": "Implantar no Proxmox com a mesma imagem e o mesmo compose/manifesto",
+          "status": "pendente",
+          "local": [],
+          "nos": [
+            "dp_proxy",
+            "dp_web",
+            "dp_worker",
+            "dp_pg"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "nenhuma alteração em dominio/ ou aplicacao/ para implantar (RNF09), verificável pelo diff; implantação pelo procedimento do perfil, com reversão descrita e aprovação do humano",
+              "status": "pendente"
+            }
+          ]
+        },
+        {
+          "id": "F4.3",
+          "titulo": "Ensaio de restauração completo dentro do RTO e do RPO",
+          "status": "pendente",
+          "local": [],
+          "nos": [
+            "dp_bkp",
+            "bkp",
+            "pg"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "restauração completa dentro do RTO aprovado e perda dentro do RPO aprovado, com relatório do ensaio",
+              "status": "pendente"
+            }
+          ]
+        },
+        {
+          "id": "F4.4",
+          "titulo": "Medir a disponibilidade do perfil de nó único por um mês",
+          "status": "pendente",
+          "local": [],
+          "nos": [
+            "dp_web",
+            "dp_pg"
+          ],
+          "aceite": [
+            {
+              "id": "A1",
+              "tipo": "criterio",
+              "valor": "meta de disponibilidade declarada e medida por um mês, com relatório",
+              "status": "pendente"
+            }
+          ]
+        },
+        {
+          "id": "F4.5",
+          "titulo": "Portão F4",
+          "status": "pendente",
+          "local": [],
+          "nos": []
+        }
+      ]
+    }
+  ],
+  "decisoes": [
+    {
+      "id": "D1",
+      "data": "2026-11-09",
+      "titulo": "Segmento (piso) de contrato misto",
+      "escolha": "(a) regime da empresa principal",
+      "porque": "Recomendação do plano (ADR-003); relatório de contratos mistos de F0.22 para o escritório validar; alerta se a principal for MEI/SN com LP/LR no contrato",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "D2",
+      "data": "2026-11-09",
+      "titulo": "Valores iniciais de π_r",
+      "escolha": "(a) piso estatístico do artigo, calculado em F0",
+      "porque": "Método escolhido; os valores saem de F0.22, comparados com a tabela atual, e entram na primeira política com aprovação do gestor no portão F0",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "D3",
+      "data": "2026-11-09",
+      "titulo": "Origem da tarifa τ",
+      "escolha": "(a) preço revelado τ̂ = ΣF/ΣH_pad, τ* só como referência",
+      "porque": "Método escolhido; valor sai de F0.22",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "D4",
+      "data": "2026-11-09",
+      "titulo": "θ e δ iniciais",
+      "escolha": "(a) θ = 15% e δ = 15%",
+      "porque": "Ponto de partida do artigo; sensibilidade de F0.18/F0.22 mostrada ao gestor no portão F0",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "D5",
+      "data": "2026-11-09",
+      "titulo": "Quem aprova (papel aprovar)",
+      "escolha": "(b), com o texto do humano: os usuários administradores do sistema para as empresas/escritórios",
+      "porque": "Resposta do humano: o papel aprovar fica com os administradores de cada inquilino (escritório); TOTP continua obrigatório",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "D6",
+      "data": "2026-11-09",
+      "titulo": "Política de retenção",
+      "escolha": "(a) proposta do plano",
+      "porque": "raw 24 meses após substituído; core enquanto o contrato estiver ativo + 5 anos; audit ≥ 5 anos e nunca antes do backup; refresh/códigos 30 dias; cotações não convertidas 12 meses; backups 35 dias de WAL + mensais por 12 meses. Confirmação do jurídico continua recomendada",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "D7",
+      "data": "2026-11-09",
+      "titulo": "Janela de reajuste",
+      "escolha": "(a) mês de aniversário do contrato, recomendação 2 meses antes do efeito",
+      "porque": "Respeita o contrato e espalha as conversas; sem mes_reajuste fica pendente de cadastro",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "D8",
+      "data": "2026-11-09",
+      "titulo": "Dono do CPF/CNPJ e base legal",
+      "escolha": "(a) escritório controlador, DynaPrice operador",
+      "porque": "Documento cifrado, perfil sem nome de pessoa física, mascaramento; base legal a registrar (confirmação do jurídico recomendada)",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "D9",
+      "data": "2026-11-09",
+      "titulo": "Onde o worker roda",
+      "escolha": "(a) toda a stack na rede do escritório",
+      "porque": "Alcance direto ao Domínio; agente de extração fica para F3",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "D10",
+      "data": "2026-11-09",
+      "titulo": "Dias de fechamento da competência",
+      "escolha": "(a) 5 dias",
+      "porque": "Escolha do humano (o plano propunha 10); F0.22 mede quando os lançamentos param de mudar e mostra o resultado no portão F0",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "D11",
+      "data": "2026-11-09",
+      "titulo": "Arredondamento comercial",
+      "escolha": "(a) só centavos, ROUND_HALF_UP",
+      "porque": "Teste da Tabela 7 usa a trajetória exata 437 → 502,55 → 577,93 → 614,27",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "D12",
+      "data": "2026-11-09",
+      "titulo": "κ̄ e justificativa",
+      "escolha": "(b) ±20%, justificativa obrigatória acima de ±5%",
+      "porque": "Recomendação do plano",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "D13",
+      "data": "2026-11-09",
+      "titulo": "Mudança de regime na janela",
+      "escolha": "(b) usa só os meses do regime novo, anterior como parcial",
+      "porque": "Nível ℓ recalculado só com meses do regime atual",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "CI",
+      "data": "2026-11-09",
+      "titulo": "Plataforma de CI e registro da imagem",
+      "escolha": "(a) GitHub Actions + GHCR",
+      "porque": "Renovate, syft e trivy prontos; o repositório irá para o GitHub (remoto ainda não existe)",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "FE-TESTE",
+      "data": "2026-11-09",
+      "titulo": "Ferramentas de teste do frontend",
+      "escolha": "(a) Vitest + Testing Library + Playwright",
+      "porque": "Mesma base do Vite; versões conferidas em F1.1",
+      "quem": "o humano (página)",
+      "ref": "respostas.jsonl"
+    },
+    {
+      "id": "D12",
+      "data": "2026-11-09",
+      "titulo": "D12 revisada: faixa do κ",
+      "escolha": "κ ∈ [1,0; 1,2]; descontos comerciais em campo separado 'desconto negociado' (justificativa acima de 5%, auditado, fora da regra de preço)",
+      "porque": "A opção ±20% permitiria κ < 1 e quebraria A1/A2 e a Prop. 7 do artigo, que pressupõem κ ≥ 1",
+      "quem": "o humano (seguir recomendações, 2026-11-09)",
+      "ref": ""
+    },
+    {
+      "id": "D5-SEG",
+      "data": "2026-11-09",
+      "titulo": "Segregação aprovar × ajustar κ",
+      "escolha": "Adiada para o portão F0",
+      "porque": "Com poucos administradores por inquilino, a segregação pode travar a operação; decidir com o relatório e o tamanho real das equipes",
+      "quem": "o humano (seguir recomendações, 2026-11-09)",
+      "ref": ""
+    },
+    {
+      "id": "D2-REF",
+      "data": "2026-11-09",
+      "titulo": "Referência inferior dos pisos",
+      "escolha": "Relatório F0.22 mostra, por regime, τ·Σβ0 (seção 6.6: piso abaixo disso nunca é vinculante) ao lado do percentil escolhido em D2",
+      "porque": "Base teórica do artigo para validar os pisos",
+      "quem": "o humano (seguir recomendações, 2026-11-09)",
+      "ref": ""
+    },
+    {
+      "id": "ENG",
+      "data": "2026-11-09",
+      "titulo": "Princípios de engenharia",
+      "escolha": "SOLID, orientação a objetos, objetos de valor e entidades, padrões só quando o caso pede; cálculo e teoria sempre conforme o artigo. Ver docs/engenharia/principios.md",
+      "porque": "Definido pelo responsável pelo projeto",
+      "quem": "o humano, 2026-11-09",
+      "ref": ""
+    },
+    {
+      "id": "D-PY",
+      "data": "2026-11-09",
+      "titulo": "Versão do Python",
+      "escolha": "Python 3.14 (gerenciado pelo uv), no lugar da 3.12 da ADR-001",
+      "porque": "3.14 tem 1 ano de correções, suporte até 2030-10 e wheels de todas as dependências; 3.15 tem 1 mês; 3.12 perde o suporte em 2028-10",
+      "quem": "o humano (seguir recomendações, 2026-11-09)",
+      "ref": "docs/versoes.md"
+    },
+    {
+      "id": "PROC",
+      "data": "2026-11-09",
+      "titulo": "Processo de construção",
+      "escolha": "TDD; portões por componente (testes, complexidade ≤ 8, linhas, dependências); sem commit pelo agente; aprovações e portões delegados ao agente; bloqueios externos ao fim ou contorno",
+      "porque": "Pedido explícito do responsável na sessão de 2026-11-09; ver docs/engenharia/principios.md seção 6",
+      "quem": "Lucas (terminal)",
+      "ref": ""
+    },
+    {
+      "id": "G1-CAL",
+      "data": "2026-11-09",
+      "titulo": "Calibração da carteira sintética",
+      "escolha": "Estatísticas do cliente do artigo conferidas por contrato; priorizar τ̂≈103,5 e P̄≈88 sobre a razão de decis (~8 em vez de ~50); empresas extras com um departamento",
+      "porque": "Os alvos do artigo são incompatíveis entre si sob o piso de β0; os que entram no preço têm prioridade (docs/lab/calibracao_sintetica.md)",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "EMP-DEP",
+      "data": "2026-11-09",
+      "titulo": "Departamentos atendidos por empresa",
+      "escolha": "Empresa.departamentos (padrão: todos); H_pad soma só os departamentos atendidos",
+      "porque": "Filial ou folha separada não tem o β0 fiscal/contábil; sem isso, o β0 de cada CNPJ extra superestima o esforço do contrato (ADR-003)",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "EST-RARO",
+      "data": "2026-11-09",
+      "titulo": "Intervalo de aceite dos β de eventos raros",
+      "escolha": "[0,5; 1,5]×β para admissões e rescisões; [0,75; 1,25]×β para os demais",
+      "porque": "Eventos com média < 1/mês concentrados em empresas grandes têm erro-padrão maior e são atenuados pelo Huber",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "ESF-Z",
+      "data": "2026-11-09",
+      "titulo": "Indicadores do modelo de esforço",
+      "escolha": "z_i = regime (base MEI) + departamentos atendidos; direcionadores de departamento não atendido valem 0 também no gerador",
+      "porque": "Sem o indicador o salto de β0 contamina as elasticidades (sinais negativos); o artigo inclui 'existência de folha' em z (Eq. 41)",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D2-P10",
+      "data": "2026-11-09",
+      "titulo": "Percentil do piso estatístico (D2 a)",
+      "escolha": "P10 do honorário vigente dos contratos com 12 meses, por regime; regime sem contratos usa o P10 da carteira; parâmetro PERCENTIL_DO_PISO",
+      "porque": "D2 (a) pede 'percentil baixo do preço praticado'; o 1º decil é o usual e o relatório mostra τ̂·Σβ0 (D2-REF) ao lado para o gestor validar no portão F0",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "F0-CONTORNO",
+      "data": "2026-11-09",
+      "titulo": "Dados reais do laboratório",
+      "escolha": "F0.21 e F0.22 adiadas para o fim; F1 segue com o rascunho de política do ensaio sintético, marcado como provisório",
+      "porque": "Dependem do escritório; o núcleo e o pipeline estão provados no sintético e a F1 não precisa dos valores reais para ser construída (a política é dado, F1.21)",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "PORTAO-F0",
+      "data": "2026-11-09",
+      "titulo": "Portão F0",
+      "escolha": "Aceito com condição",
+      "porque": "Núcleo, estimação, simulação e relatório prontos e testados; os valores das decisões D1, D2, D3, D4, D10 e D13 serão aprovados quando a F0.22 rodar com dados reais (fim do projeto)",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-PG",
+      "data": "2026-11-10",
+      "titulo": "Versão do PostgreSQL",
+      "escolha": "PostgreSQL 18",
+      "porque": "Ciclo atual, suporte até 2030-11",
+      "quem": "Agente (delegado por Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-NODE",
+      "data": "2026-11-10",
+      "titulo": "Versão do Node",
+      "escolha": "Node 24 LTS",
+      "porque": "Instalado na máquina, atende aos engines; 26 virou LTS há duas semanas",
+      "quem": "Agente (delegado por Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-TS",
+      "data": "2026-11-10",
+      "titulo": "Versão do TypeScript",
+      "escolha": "5.9.3",
+      "porque": "openapi-typescript exige ^5.x e typescript-eslint <6.1",
+      "quem": "Agente (delegado por Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-ODBC",
+      "data": "2026-11-10",
+      "titulo": "Driver do Domínio na imagem",
+      "escolha": "Fora da imagem até ler a licença",
+      "porque": "Licença e redistribuição da SAP não confirmadas; F1.23 usa ODBC falso",
+      "quem": "Agente (delegado por Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "F1-FILA",
+      "data": "2026-11-10",
+      "titulo": "Parâmetros da fila",
+      "escolha": "5 tentativas; backoff 60 s×2^(n−1) até 1 h; lease 5 min; heartbeat 60 s",
+      "porque": "Cobrem queda transitória do Domínio/Omie sem atrasar a competência; são parâmetros",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-REVOG",
+      "data": "2026-11-10",
+      "titulo": "Revogação de política",
+      "escolha": "Sem estado Revogada no MVP; corrige-se publicando nova versão",
+      "porque": "Mantém a política imutável e simples; opção fica para o portão F1",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-APR-NEXP",
+      "data": "2026-11-10",
+      "titulo": "Aprovada não exportada",
+      "escolha": "Não expira; recalibração pula o contrato e alerta",
+      "porque": "Decisão humana não pode ser perdida por falha técnica",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-INDICE",
+      "data": "2026-11-10",
+      "titulo": "INDICE_INFLACAO",
+      "escolha": "Global, sem tenant_id",
+      "porque": "IPCA é dado único; RLS não se aplica; só a cli escreve",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-PROV",
+      "data": "2026-11-10",
+      "titulo": "Revisão do provisório",
+      "escolha": "Avaliado todo mês; revisão integral na 1ª recalibração com ℓ=2, fora da janela",
+      "porque": "ADR-004 item 4",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-PORTAO-EQ",
+      "data": "2026-11-10",
+      "titulo": "Portão de aceite das equações",
+      "escolha": "EAM fora da amostra ≤ 1,05 × vigente; sem vigente, todos os β ≥ 0",
+      "porque": "O R² do Ridge saiu do caminho do preço (E2); o erro em horas mede o que importa",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-HASH",
+      "data": "2026-11-10",
+      "titulo": "Serialização da cadeia de auditoria",
+      "escolha": "pg_advisory_xact_lock do tenant",
+      "porque": "Evita bifurcação sem bloquear outros tenants",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-RECARGA",
+      "data": "2026-11-10",
+      "titulo": "Recarga da política",
+      "escolha": "NOTIFY + recarga ao reconectar + conferência de versão por cotação",
+      "porque": "NOTIFY pode se perder",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-CRED-APP",
+      "data": "2026-11-10",
+      "titulo": "Credencial do dynaprice_app",
+      "escolha": "SCRAM-SHA-256; URL em arquivo de segredo",
+      "porque": "Segredo fora da imagem e do repositório",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-ROT-CHAVE",
+      "data": "2026-11-10",
+      "titulo": "Rotação da chave mestra",
+      "escolha": "Envelope com kid; cli rotacionar-chave",
+      "porque": "Recifra sem parada",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-UPLOAD",
+      "data": "2026-11-10",
+      "titulo": "Limites do upload",
+      "escolha": "10 MB, 50 mil linhas, sem macro/fórmula, 100 MB descomprimidos",
+      "porque": "Fronteira de confiança da planilha (seção 9)",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-REFRESH",
+      "data": "2026-11-10",
+      "titulo": "Janela de tolerância do refresh",
+      "escolha": "10 s: reuso responde 409 sem revogar",
+      "porque": "Duas abas não derrubam a sessão; o cookie já foi rotacionado",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "PORTAO-F1.6",
+      "data": "2026-11-10",
+      "titulo": "Revisão do desenho de F1",
+      "escolha": "Aceito por delegação",
+      "porque": "Lucas delegou aprovações (principios §6.3); não revisou pessoalmente as mudanças de F1.2 a F1.5, que seguem visíveis no desenho",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-RECUP",
+      "data": "2026-11-11",
+      "titulo": "Entrega do link de redefinição",
+      "escolha": "Administrador gera e repassa o link; MVP sem envio de e-mail",
+      "porque": "Sem serviço de e-mail no plano do piloto",
+      "quem": "agente (delegação do Lucas)",
+      "ref": ""
+    },
+    {
+      "id": "D-PORTAO-F1",
+      "data": "2026-11-14",
+      "titulo": "Portão F1 aceito com condição",
+      "escolha": "Aceitar F1 por delegação; F1.42 (piloto no escritório) fica adiada ao fim",
+      "porque": "Todos os critérios do marco F1 têm teste verde (624 backend, 43 frontend); F1.42 exige a rede do escritório, a TI e aprovação humana, que não dependem de código",
+      "quem": "Claude, por delegação de Lucas",
+      "ref": ""
+    },
+    {
+      "id": "D-COT",
+      "data": "2026-11-14",
+      "titulo": "Cotação não cria contrato",
+      "escolha": "A cotação é registro; o contrato nasce na importação, provisório (D13), e a reprodução usa a versão gravada",
+      "porque": "Evita criar contrato sem vínculo com Domínio/Omie; o relatório de provisórios abaixo do esforço cobre o período provisório",
+      "quem": "Claude, por delegação",
+      "ref": ""
+    },
+    {
+      "id": "D-PORTAO-F2",
+      "data": "2026-11-14",
+      "titulo": "Portão F2 aceito",
+      "escolha": "Aceitar F2 por delegação",
+      "porque": "p95 32 ms a 20 req/s (RNF02); provisório revisado testado; EPAM por ocultação registrado (docs/lab/ocultacao.md); reprodutibilidade da cotação testada. Reexecutar a carga no piloto (F1.42)",
+      "quem": "Claude, por delegação de Lucas",
+      "ref": ""
+    },
+    {
+      "id": "D-OIDC",
+      "data": "2026-11-14",
+      "titulo": "Federação OIDC sem dependência nova",
+      "escolha": "Código com PKCE, id_token validado com PyJWT+httpx; IdP não cria conta; MFA próprio mantido",
+      "porque": "Menor superfície: nenhuma biblioteca de OIDC a manter; JWT próprio preservado (ADR-002)",
+      "quem": "Claude, por delegação",
+      "ref": ""
+    },
+    {
+      "id": "D-MVIZ",
+      "data": "2026-11-14",
+      "titulo": "m_viz (vizinhança) não habilitada",
+      "escolha": "Manter sem_historico = piso_regime; a política segue recusando 'vizinhos'",
+      "porque": "Critério da F3.4: só com EPAM melhor. No sintético o piso erra 18,5% e a vizinhança 22–27% (docs/lab/ocultacao.md). Reabrir com dados reais (F0.21) e perfil mais rico",
+      "quem": "Claude, por delegação",
+      "ref": ""
+    },
+    {
+      "id": "D-PORTAO-F3",
+      "data": "2026-11-14",
+      "titulo": "Portão F3 aceito com condição",
+      "escolha": "Aceitar F3 por delegação; F3.3 (Omie por API) e F3.6 (2º inquilino real, agente) adiados ao fim",
+      "porque": "OIDC, consultor, BCB/IPCA e âncora têm teste verde (747 backend, 56 frontend); o restante exige conta de homologação, IdP real e um segundo escritório",
+      "quem": "Claude, por delegação",
+      "ref": ""
+    }
+  ]
+}

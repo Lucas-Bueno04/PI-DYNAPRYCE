@@ -1,0 +1,15 @@
+{"t":"2026-11-09T16:57:30-0300","id":"D1","titulo":"D1: segmento (piso) de contrato com empresas de regimes diferentes","opcao":"a","texto":"","quem":"o humano (página)"}
+{"t":"2026-11-09T16:57:37-0300","id":"D2","titulo":"D2: valores iniciais de π_r (MEI, SN, LP, LR)","opcao":"a","texto":"","quem":"o humano (página)"}
+{"t":"2026-11-09T16:57:42-0300","id":"D3","titulo":"D3: origem da tarifa τ","opcao":"a","texto":"","quem":"o humano (página)"}
+{"t":"2026-11-09T16:57:45-0300","id":"D4","titulo":"D4: θ (teto real de alta por ciclo) e δ (gatilho) iniciais","opcao":"a","texto":"","quem":"o humano (página)"}
+{"t":"2026-11-09T16:58:54-0300","id":"D5","titulo":"D5: quem é o gestor que aprova (papel aprovar)","opcao":"b","texto":"os usuarios administradores do sistema para as empresas / escritorios . ","quem":"o humano (página)"}
+{"t":"2026-11-09T16:59:07-0300","id":"D6","titulo":"D6: política de retenção","opcao":"a","texto":"","quem":"o humano (página)"}
+{"t":"2026-11-09T16:59:15-0300","id":"D7","titulo":"D7: janela de reajuste por contrato","opcao":"a","texto":"","quem":"o humano (página)"}
+{"t":"2026-11-09T16:59:20-0300","id":"D8","titulo":"D8: dono do CPF/CNPJ (MEI) e base legal","opcao":"a","texto":"","quem":"o humano (página)"}
+{"t":"2026-11-09T16:59:34-0300","id":"D9","titulo":"D9: onde o worker (motores) roda em relação ao Domínio","opcao":"a","texto":"","quem":"o humano (página)"}
+{"t":"2026-11-09T16:59:51-0300","id":"D10","titulo":"D10: dias para fechar a competência (dias_fechamento)","opcao":"a","texto":"","quem":"o humano (página)"}
+{"t":"2026-11-09T16:59:53-0300","id":"D11","titulo":"D11: arredondamento comercial","opcao":"a","texto":"","quem":"o humano (página)"}
+{"t":"2026-11-09T17:00:00-0300","id":"D12","titulo":"D12: κ̄ (limite do ajuste do gestor) e justificativa","opcao":"b","texto":"","quem":"o humano (página)"}
+{"t":"2026-11-09T17:00:04-0300","id":"D13","titulo":"D13: mudança de regime dentro da janela de 12 meses","opcao":"b","texto":"","quem":"o humano (página)"}
+{"t":"2026-11-09T17:00:21-0300","id":"CI","titulo":"Plataforma de CI e registro da imagem","opcao":"a","texto":"","quem":"o humano (página)"}
+{"t":"2026-11-09T17:00:26-0300","id":"FE-TESTE","titulo":"Ferramentas de teste do frontend (unidade e ponta a ponta)","opcao":"a","texto":"","quem":"o humano (página)"}
