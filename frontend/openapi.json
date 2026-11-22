@@ -502,6 +502,111 @@
         "title": "RespostaCadastro",
         "type": "object"
       },
+      "RespostaCliente": {
+        "properties": {
+          "cobrado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cobrado"
+          },
+          "contrato_id": {
+            "title": "Contrato Id",
+            "type": "string"
+          },
+          "defasagem_pct": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Defasagem Pct"
+          },
+          "empresas": {
+            "title": "Empresas",
+            "type": "integer"
+          },
+          "kappa": {
+            "title": "Kappa",
+            "type": "string"
+          },
+          "mes_reajuste": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mes Reajuste"
+          },
+          "preco_alvo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preco Alvo"
+          },
+          "preco_vigente": {
+            "title": "Preco Vigente",
+            "type": "string"
+          },
+          "provisorio": {
+            "title": "Provisorio",
+            "type": "boolean"
+          },
+          "recomendacao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recomendacao"
+          },
+          "regime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regime"
+          }
+        },
+        "required": [
+          "contrato_id",
+          "regime",
+          "empresas",
+          "preco_vigente",
+          "preco_alvo",
+          "defasagem_pct",
+          "cobrado",
+          "mes_reajuste",
+          "provisorio",
+          "kappa",
+          "recomendacao"
+        ],
+        "title": "RespostaCliente",
+        "type": "object"
+      },
       "RespostaConector": {
         "properties": {
           "credencial_configurada": {
@@ -676,6 +781,24 @@
         "title": "RespostaEntrar",
         "type": "object"
       },
+      "RespostaFaixa": {
+        "properties": {
+          "contratos": {
+            "title": "Contratos",
+            "type": "integer"
+          },
+          "rotulo": {
+            "title": "Rotulo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rotulo",
+          "contratos"
+        ],
+        "title": "RespostaFaixa",
+        "type": "object"
+      },
       "RespostaImportacao": {
         "properties": {
           "quarentena": {
@@ -718,6 +841,110 @@
           "lote_id"
         ],
         "title": "RespostaLote",
+        "type": "object"
+      },
+      "RespostaPainel": {
+        "properties": {
+          "alertas": {
+            "title": "Alertas",
+            "type": "integer"
+          },
+          "competencia": {
+            "title": "Competencia",
+            "type": "string"
+          },
+          "competencias_com_dados": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Competencias Com Dados",
+            "type": "array"
+          },
+          "contratos": {
+            "title": "Contratos",
+            "type": "integer"
+          },
+          "divergencias": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Divergencias",
+            "type": "object"
+          },
+          "empresas": {
+            "title": "Empresas",
+            "type": "integer"
+          },
+          "faixas": {
+            "items": {
+              "$ref": "#/components/schemas/RespostaFaixa"
+            },
+            "title": "Faixas",
+            "type": "array"
+          },
+          "maiores_defasagens": {
+            "items": {
+              "$ref": "#/components/schemas/RespostaCliente"
+            },
+            "title": "Maiores Defasagens",
+            "type": "array"
+          },
+          "por_regime": {
+            "items": {
+              "$ref": "#/components/schemas/RespostaRegime"
+            },
+            "title": "Por Regime",
+            "type": "array"
+          },
+          "potencial_de_reajuste": {
+            "title": "Potencial De Reajuste",
+            "type": "string"
+          },
+          "provisorios": {
+            "title": "Provisorios",
+            "type": "integer"
+          },
+          "receita_alvo": {
+            "title": "Receita Alvo",
+            "type": "string"
+          },
+          "receita_mensal": {
+            "title": "Receita Mensal",
+            "type": "string"
+          },
+          "recomendacoes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Recomendacoes",
+            "type": "object"
+          },
+          "serie_receita": {
+            "items": {
+              "$ref": "#/components/schemas/RespostaPonto"
+            },
+            "title": "Serie Receita",
+            "type": "array"
+          }
+        },
+        "required": [
+          "competencia",
+          "empresas",
+          "contratos",
+          "provisorios",
+          "receita_mensal",
+          "receita_alvo",
+          "potencial_de_reajuste",
+          "alertas",
+          "competencias_com_dados",
+          "por_regime",
+          "serie_receita",
+          "faixas",
+          "recomendacoes",
+          "divergencias",
+          "maiores_defasagens"
+        ],
+        "title": "RespostaPainel",
         "type": "object"
       },
       "RespostaPolitica": {
@@ -767,6 +994,24 @@
           "relatorio"
         ],
         "title": "RespostaPolitica",
+        "type": "object"
+      },
+      "RespostaPonto": {
+        "properties": {
+          "competencia": {
+            "title": "Competencia",
+            "type": "string"
+          },
+          "valor": {
+            "title": "Valor",
+            "type": "string"
+          }
+        },
+        "required": [
+          "competencia",
+          "valor"
+        ],
+        "title": "RespostaPonto",
         "type": "object"
       },
       "RespostaProvisorio": {
@@ -875,6 +1120,34 @@
           "token"
         ],
         "title": "RespostaRedefinicao",
+        "type": "object"
+      },
+      "RespostaRegime": {
+        "properties": {
+          "contratos": {
+            "title": "Contratos",
+            "type": "integer"
+          },
+          "empresas": {
+            "title": "Empresas",
+            "type": "integer"
+          },
+          "receita": {
+            "title": "Receita",
+            "type": "string"
+          },
+          "regime": {
+            "title": "Regime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "regime",
+          "empresas",
+          "contratos",
+          "receita"
+        ],
+        "title": "RespostaRegime",
         "type": "object"
       },
       "RespostaReproducao": {
@@ -1624,6 +1897,59 @@
         "x-papel": "publica"
       }
     },
+    "/api/v1/clientes": {
+      "get": {
+        "operationId": "listar_clientes_api_v1_clientes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "competencia",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}$",
+              "title": "Competencia",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RespostaCliente"
+                  },
+                  "title": "Response Listar Clientes Api V1 Clientes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Clientes",
+        "tags": [
+          "carteira"
+        ],
+        "x-papel": "ver_carteira"
+      }
+    },
     "/api/v1/conectores": {
       "get": {
         "operationId": "listar_conectores_api_v1_conectores_get",
@@ -2270,6 +2596,55 @@
           "operacao"
         ],
         "x-papel": "gerir_usuarios"
+      }
+    },
+    "/api/v1/painel": {
+      "get": {
+        "operationId": "painel_api_v1_painel_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "competencia",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}$",
+              "title": "Competencia",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaPainel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Painel",
+        "tags": [
+          "carteira"
+        ],
+        "x-papel": "ver_carteira"
       }
     },
     "/api/v1/politicas": {
