@@ -21,10 +21,6 @@ class Horas:
     def de(cls, valor: Numero) -> Horas:
         return cls(para_decimal(valor, "horas"))
 
-    @classmethod
-    def zero(cls) -> Horas:
-        return cls(Decimal(0))
-
     def __add__(self, outra: Horas) -> Horas:
         return Horas(self.valor + outra.valor)
 

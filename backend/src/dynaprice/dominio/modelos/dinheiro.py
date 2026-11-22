@@ -25,10 +25,6 @@ class Dinheiro:
     def de(cls, valor: Numero) -> Dinheiro:
         return cls(para_decimal(valor, "dinheiro").quantize(CENTAVO, rounding=ROUND_HALF_UP))
 
-    @classmethod
-    def zero(cls) -> Dinheiro:
-        return cls(Decimal("0.00"))
-
     def __add__(self, outro: Dinheiro) -> Dinheiro:
         return Dinheiro(self.valor + outro.valor)
 

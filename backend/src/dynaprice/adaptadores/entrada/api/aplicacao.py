@@ -2,10 +2,10 @@
 
 import re
 import time
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable
 from uuid import uuid4
 
-from fastapi import APIRouter, FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response
 
 from dynaprice.adaptadores.entrada.api.erros import registrar_erros
 from dynaprice.adaptadores.entrada.api.metricas import Metricas
@@ -41,7 +41,7 @@ async def _request_id(
     return resposta
 
 
-def criar_app(servicos: Servicos, rotas_extras: Sequence[APIRouter] = ()) -> FastAPI:
+def criar_app(servicos: Servicos) -> FastAPI:
     app = FastAPI(
         title="DynaPrice API",
         version="1.0.0",
@@ -53,6 +53,6 @@ def criar_app(servicos: Servicos, rotas_extras: Sequence[APIRouter] = ()) -> Fas
     app.state.metricas = Metricas()
     app.middleware("http")(_request_id)
     registrar_erros(app)
-    for modulo in (*ROTEADORES, *rotas_extras):
+    for modulo in ROTEADORES:
         app.include_router(modulo, prefix=PREFIXO)
     return app

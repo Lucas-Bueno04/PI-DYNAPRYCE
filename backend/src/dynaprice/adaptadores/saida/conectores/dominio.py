@@ -48,7 +48,7 @@ class ConectorDominio:
         erro_do_driver: type[Exception],
         tempo_s: int = 60,
     ) -> None:
-        # O erro vem injetado: pyodbc exige libodbc, instalada só onde o conector roda (D-ODBC).
+        # O erro vem injetado para não importar pyodbc aqui: ele exige libodbc (D-ODBC).
         self._conectar = conectar
         self._p = pseudonimizador
         self._erro_do_driver = erro_do_driver

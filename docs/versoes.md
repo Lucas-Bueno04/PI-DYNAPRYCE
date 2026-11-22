@@ -41,7 +41,6 @@ Fonte: API JSON do PyPI. Todas publicam wheel `cp314` ou `py3-none`, compatívei
 | fastapi | 0.162.4 | 2026-11-10 | MIT | ativo |
 | uvicorn | 0.54.0 | 2026-09-25 | BSD-3-Clause | ativo |
 | pydantic | 2.14.3 | 2026-11-05 | MIT | ativo |
-| pydantic-settings | 2.16.2 | 2026-10-28 | MIT | ativo |
 | SQLAlchemy | 2.1.8 | 2026-11-04 | MIT | ativo |
 | psycopg (com psycopg-binary) | 3.3.8 | 2026-11-04 | **LGPL-3.0-only** | ativo; uso como biblioteca sem alteração. **A confirmar** com o jurídico se o produto for distribuído a terceiros |
 | alembic | 1.20.1 | 2026-10-22 | MIT | ativo |
@@ -104,7 +103,7 @@ Fonte: registry do npm (`dist-tags.latest`, licença, `peerDependencies` e `engi
 | react-router | 8.5.1 | 2026-10-27 | MIT | ativo; Node ≥22.22 |
 | @tanstack/react-query | 5.107.1 | 2026-11-06 | MIT | ativo |
 | @tanstack/react-table | 9.3.1 | 2026-10-12 | MIT | ativo |
-| @mantine/core, hooks, notifications | 9.8.0 | 2026-11-09 | MIT | ativo; pede React ≥19.2 |
+| @mantine/core, hooks | 9.8.0 | 2026-11-09 | MIT | ativo; pede React ≥19.2 |
 | echarts | 6.1.0 | 2026-05-19 | Apache-2.0 | ativo |
 | echarts-for-react | 3.0.6 | 2026-01-21 | MIT | aceita ECharts 6 |
 | react-hook-form | 7.91.0 | 2026-10-23 | MIT | ativo |

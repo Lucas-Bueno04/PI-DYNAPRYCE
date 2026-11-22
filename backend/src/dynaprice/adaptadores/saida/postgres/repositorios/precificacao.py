@@ -1,4 +1,4 @@
-"""Repositórios de política, preço-alvo, recomendação e divergência."""
+"""Repositórios de política, preço-alvo e recomendação."""
 
 from collections.abc import Mapping, Sequence
 from datetime import datetime

@@ -1,6 +1,8 @@
 """Composição da linha de comando."""
 
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from importlib.metadata import version
 from pathlib import Path
 from uuid import UUID
@@ -9,6 +11,7 @@ import httpx
 import typer
 
 from dynaprice.adaptadores.entrada.api.aplicacao import criar_app
+from dynaprice.adaptadores.entrada.api.seguranca import Servicos
 from dynaprice.adaptadores.entrada.cli.comandos import FabricasDoLab, criar_cli, criar_grupo_lab
 from dynaprice.adaptadores.entrada.cli.operacao import FabricasDeOperacao, registrar_operacao
 from dynaprice.adaptadores.saida.arquivos import (
@@ -110,16 +113,20 @@ def _criar_admin(inquilino: str, email: str, senha: str) -> UUID:
         return CriarPrimeiroAdministrador(deps).executar(inquilino, email, senha)
 
 
-def _recalcular(tenant: UUID, identificador: UUID) -> ComparacaoDoRecalculo:
+@contextmanager
+def _fabrica_de_unidades(relogio: RelogioDoSistema) -> Iterator[FabricaDeUnidadesPostgres]:
     with abrir_pool(ler_segredo("DYNAPRICE_DB_URL_FILE"), tamanho_maximo=2) as pool:
-        fabrica = FabricaDeUnidadesPostgres(pool, RelogioDoSistema())
+        yield FabricaDeUnidadesPostgres(pool, relogio)
+
+
+def _recalcular(tenant: UUID, identificador: UUID) -> ComparacaoDoRecalculo:
+    with _fabrica_de_unidades(RelogioDoSistema()) as fabrica:
         return RecalcularPrecoAlvo(fabrica).executar(tenant, identificador)
 
 
 def _rotacionar_chave() -> int:
     chaves = carregar_chaves_mestras(caminho_do_segredo("DYNAPRICE_CHAVES_MESTRAS_FILE"))
-    with abrir_pool(ler_segredo("DYNAPRICE_DB_URL_FILE"), tamanho_maximo=2) as pool:
-        fabrica = FabricaDeUnidadesPostgres(pool, RelogioDoSistema())
+    with _fabrica_de_unidades(RelogioDoSistema()) as fabrica:
         return RotacionarChaveMestra(fabrica, CifradorAesGcm(chaves)).executar()
 
 
@@ -141,20 +148,16 @@ def _arquivo_de_ancora() -> AncoraEmArquivo:
 
 def _ancorar_auditoria() -> int:
     relogio = RelogioDoSistema()
-    with abrir_pool(ler_segredo("DYNAPRICE_DB_URL_FILE"), tamanho_maximo=2) as pool:
-        fabrica = FabricaDeUnidadesPostgres(pool, relogio)
+    with _fabrica_de_unidades(relogio) as fabrica:
         return AncorarAuditoria(fabrica, _arquivo_de_ancora(), relogio).executar()
 
 
 def _verificar_auditoria() -> tuple[ResultadoDaVerificacao, ...]:
-    with abrir_pool(ler_segredo("DYNAPRICE_DB_URL_FILE"), tamanho_maximo=2) as pool:
-        fabrica = FabricaDeUnidadesPostgres(pool, RelogioDoSistema())
+    with _fabrica_de_unidades(RelogioDoSistema()) as fabrica:
         return VerificarAuditoria(fabrica, _arquivo_de_ancora()).executar()
 
 
 def _exportar_openapi(saida: Path) -> None:
-    from dynaprice.adaptadores.entrada.api.seguranca import Servicos
-
     exportar_openapi(saida, criar_app(Servicos(None, "")))  # type: ignore[arg-type]
 
 

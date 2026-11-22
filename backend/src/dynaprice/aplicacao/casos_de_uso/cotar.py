@@ -14,7 +14,7 @@ from uuid import UUID
 from dynaprice.aplicacao.autorizacao import Acao, autorizar
 from dynaprice.aplicacao.erros import Conflito, NaoEncontrado
 from dynaprice.aplicacao.politica_em_memoria import PoliticaEmMemoria, PoliticaVigente
-from dynaprice.aplicacao.portas import FabricaDeUnidades, Relogio
+from dynaprice.aplicacao.portas import FabricaDeUnidades, Relogio, UnidadeDeTrabalho
 from dynaprice.dominio.modelos import Dinheiro, Horas, Kappa, Regime, fabricar_politica
 from dynaprice.dominio.modelos.autenticacao import Principal
 from dynaprice.dominio.precificacao import NucleoDePreco
@@ -114,7 +114,7 @@ class CotarServico:
 
     @staticmethod
     def _gravar(
-        uow: Any,
+        uow: UnidadeDeTrabalho,
         principal: Principal,
         vigente: PoliticaVigente,
         pedido: PedidoDeCotacao,

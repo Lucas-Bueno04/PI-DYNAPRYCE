@@ -15,7 +15,7 @@ _OMIE_URL = "https://app.omie.com.br"
 
 def _fonte_dominio(chave: bytes) -> Any:
     def montar(credencial: Mapping[str, Any], _parametros: Mapping[str, Any]) -> FonteDeCarteira:
-        # Importação tardia: pyodbc exige libodbc, presente só com o conector habilitado (D-ODBC).
+        # Importação tardia: pyodbc exige libodbc, ausente em hosts de dev sem unixodbc (D-ODBC).
         import pyodbc
 
         return ConectorDominio(
