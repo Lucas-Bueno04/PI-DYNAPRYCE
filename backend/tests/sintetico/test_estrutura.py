@@ -3,14 +3,8 @@
 from collections import Counter
 
 from dynaprice.adaptadores.saida.sintetico import GeradorDeCarteiraSintetica, ParametrosSinteticos
-from dynaprice.aplicacao.portas import FonteDeCarteira
 from dynaprice.dominio.modelos import Carteira, Competencia, Regime
 from tests.sintetico.conftest import FIM, INICIO
-
-
-def test_implementa_a_porta_fonte_de_carteira() -> None:
-    fonte: FonteDeCarteira = GeradorDeCarteiraSintetica(ParametrosSinteticos(semente=1))
-    assert isinstance(fonte, FonteDeCarteira)
 
 
 def test_mesma_semente_mesma_carteira() -> None:

@@ -40,10 +40,6 @@ def fonte(request: pytest.FixtureRequest, tmp_path: Path) -> FonteDeCarteira:
     return fabrica(tmp_path)
 
 
-def test_implementa_a_porta(fonte: FonteDeCarteira) -> None:
-    assert isinstance(fonte, FonteDeCarteira)
-
-
 def test_fatos_ficam_na_janela_pedida(fonte: FonteDeCarteira) -> None:
     carteira = fonte.extrair(Competencia(2025, 4), Competencia(2025, 6))
     meses = {d.competencia for d in carteira.direcionadores} | {

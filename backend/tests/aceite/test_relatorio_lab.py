@@ -66,7 +66,9 @@ def test_anexo_e_um_rascunho_de_politica_valido(relatorio: Relatorio) -> None:
 def test_cli_lab_relatorio(tmp_path: Path) -> None:
     entrada, saida = tmp_path / "sintetico-42", tmp_path / "relatorio"
     runner = CliRunner()
-    gerar = runner.invoke(app, ["lab", "sintetico", "--semente", "42", "--saida", str(entrada)])
+    gerar = runner.invoke(
+        app, ["lab", "sintetico", "--semente", "42", "--contratos", "60", "--saida", str(entrada)]
+    )
     assert gerar.exit_code == 0, gerar.output
     assert LeitorDeCarteiraCsv(entrada).extrair(Competencia(2025, 1), REF).contratos
     resultado = runner.invoke(

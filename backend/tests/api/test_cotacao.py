@@ -17,12 +17,6 @@ def _cabecalho(cliente: TestClient, tenant: UUID, *papeis: Papel) -> dict[str, s
     return {"Authorization": f"Bearer {emissor.emitir(principal)}"}
 
 
-@pytest.fixture
-def preco(cliente: TestClient, novo_tenant: UUID, banco: object) -> CenarioDePreco:
-    auth = cliente.app.state.servicos.auth  # type: ignore[attr-defined]
-    return CenarioDePreco(auth.fabrica, auth.relogio, novo_tenant, banco)  # type: ignore[arg-type]
-
-
 def test_cotacao_sem_historico_devolve_201_com_decomposicao(
     cliente: TestClient, preco: CenarioDePreco
 ) -> None:

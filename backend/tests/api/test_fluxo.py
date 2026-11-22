@@ -2,7 +2,6 @@
 
 from uuid import UUID, uuid4
 
-import pytest
 from fastapi.testclient import TestClient
 
 from dynaprice.aplicacao.casos_de_uso.recalibrar import Recalibrar
@@ -16,12 +15,6 @@ def _cabecalho(cliente: TestClient, tenant: UUID, *papeis: Papel) -> dict[str, s
     principal = Principal(uuid4(), tenant, frozenset(papeis), True)
     emissor = cliente.app.state.servicos.auth.emissor  # type: ignore[attr-defined]
     return {"Authorization": f"Bearer {emissor.emitir(principal)}"}
-
-
-@pytest.fixture
-def preco(cliente: TestClient, novo_tenant: UUID, banco: object) -> CenarioDePreco:
-    auth = cliente.app.state.servicos.auth  # type: ignore[attr-defined]
-    return CenarioDePreco(auth.fabrica, auth.relogio, novo_tenant, banco)  # type: ignore[arg-type]
 
 
 def _com_pendente(preco: CenarioDePreco) -> None:

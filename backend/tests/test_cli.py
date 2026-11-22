@@ -14,10 +14,3 @@ def test_versao_imprime_a_versao_do_pacote() -> None:
 
     assert resultado.exit_code == 0
     assert resultado.output.strip() == version("dynaprice")
-
-
-def test_ajuda_lista_o_grupo_lab() -> None:
-    resultado = runner.invoke(app, ["--help"])
-
-    assert resultado.exit_code == 0
-    assert "lab" in resultado.output

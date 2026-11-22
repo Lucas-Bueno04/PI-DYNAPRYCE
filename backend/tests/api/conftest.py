@@ -1,6 +1,7 @@
 """API real sobre banco real, montada pelo Composition Root."""
 
 from collections.abc import Iterator
+from uuid import UUID
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -10,6 +11,7 @@ from psycopg_pool import ConnectionPool
 
 from dynaprice.adaptadores.saida.seguranca import ChavesEs256, HashDeSenhaArgon2
 from dynaprice.principal import ConfiguracaoDaApi, criar_api
+from tests.aplicacao.preco_apoio import CenarioDePreco
 from tests.fakes import RelogioFixo
 
 
@@ -45,3 +47,9 @@ def cliente(configuracao: ConfiguracaoDaApi) -> Iterator[TestClient]:
         criar_api(configuracao), base_url="https://dynaprice.teste", raise_server_exceptions=False
     ) as aberto:
         yield aberto
+
+
+@pytest.fixture
+def preco(cliente: TestClient, novo_tenant: UUID, banco: object) -> CenarioDePreco:
+    auth = cliente.app.state.servicos.auth  # type: ignore[attr-defined]
+    return CenarioDePreco(auth.fabrica, auth.relogio, novo_tenant, banco)  # type: ignore[arg-type]
