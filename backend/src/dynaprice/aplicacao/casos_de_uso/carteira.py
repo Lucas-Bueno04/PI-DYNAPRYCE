@@ -5,7 +5,7 @@ a identificação da empresa é um pseudônimo (RNF05), nunca o nome nem o CNPJ.
 """
 
 from collections import Counter, defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -82,10 +82,6 @@ class Painel:
     maiores_defasagens: tuple[LinhaDeCliente, ...]
 
 
-def _ativo(vinculo: Vinculo, competencia: Competencia) -> bool:
-    return vinculo.desde <= competencia and (vinculo.ate is None or competencia <= vinculo.ate)
-
-
 def _defasagem(vigente: Decimal, alvo: Decimal | None) -> Decimal | None:
     if alvo is None or alvo == _ZERO:
         return None
@@ -101,21 +97,33 @@ def _regime_do_contrato(vinculos: Sequence[Vinculo], empresas: Mapping[str, Empr
     return None
 
 
-def _linhas(uow: UnidadeDeTrabalho, competencia: Competencia) -> tuple[LinhaDeCliente, ...]:
-    empresas = {e.id: e for e in uow.empresas.listar()}
+def _vinculos_ativos(
+    vinculos: Sequence[Vinculo], competencia: Competencia
+) -> dict[str, list[Vinculo]]:
     ativos: dict[str, list[Vinculo]] = defaultdict(list)
-    for vinculo in uow.vinculos.listar():
-        if _ativo(vinculo, competencia):
+    for vinculo in vinculos:
+        if vinculo.vigente_em(competencia):
             ativos[vinculo.contrato_id].append(vinculo)
-    alvos = {a.contrato_id: a.preco_alvo for a in uow.precos_alvo.da_competencia(competencia)}
-    cobrados = {
-        h.contrato_id: h.valor.valor for h in uow.fatos.honorarios_da_competencia(competencia)
-    }
+    return ativos
+
+
+def _ultima_recomendacao(uow: UnidadeDeTrabalho) -> dict[str, str]:
     ultima: dict[str, tuple[Competencia, str]] = {}
     for r in uow.recomendacoes.listar():
         anterior = ultima.get(r.contrato_id)
         if anterior is None or anterior[0] <= r.competencia:
             ultima[r.contrato_id] = (r.competencia, r.estado.value)
+    return {contrato_id: estado for contrato_id, (_, estado) in ultima.items()}
+
+
+def _linhas(uow: UnidadeDeTrabalho, competencia: Competencia) -> tuple[LinhaDeCliente, ...]:
+    empresas = {e.id: e for e in uow.empresas.listar()}
+    ativos = _vinculos_ativos(uow.vinculos.listar(), competencia)
+    alvos = {a.contrato_id: a.preco_alvo for a in uow.precos_alvo.da_competencia(competencia)}
+    cobrados = {
+        h.contrato_id: h.valor.valor for h in uow.fatos.honorarios_da_competencia(competencia)
+    }
+    recomendacoes = _ultima_recomendacao(uow)
     contratos: Sequence[Contrato] = uow.contratos.listar()
     return tuple(
         LinhaDeCliente(
@@ -129,7 +137,7 @@ def _linhas(uow: UnidadeDeTrabalho, competencia: Competencia) -> tuple[LinhaDeCl
             mes_reajuste=c.mes_reajuste,
             provisorio=c.provisorio,
             kappa=c.kappa.valor,
-            recomendacao=ultima[c.id][1] if c.id in ultima else None,
+            recomendacao=recomendacoes.get(c.id),
         )
         for c in sorted(contratos, key=lambda c: c.id)
     )
@@ -167,19 +175,7 @@ class ConsultarPainel:
         autorizar(principal, Acao.VER_CARTEIRA)
         with self._fabrica.para_tenant(principal.tenant_id) as uow:
             linhas = _linhas(uow, competencia)
-            totais = {
-                mes: sum((h.valor.valor for h in uow.fatos.honorarios_da_competencia(mes)), _ZERO)
-                for mes in (competencia.somar(-i) for i in range(MESES_DE_BUSCA))
-            }
-            serie = tuple(
-                PontoDaSerie(str(competencia.somar(-i)), totais[competencia.somar(-i)])
-                for i in range(MESES_DA_SERIE - 1, -1, -1)
-            )
-            com_dados = tuple(
-                str(competencia.somar(-i))
-                for i in range(MESES_DE_BUSCA)
-                if totais[competencia.somar(-i)] > _ZERO
-            )
+            totais = _receita_por_mes(uow, competencia)
             recomendacoes = Counter(r.estado.value for r in uow.recomendacoes.listar())
             divergencias = Counter(d.situacao.value for d in uow.divergencias.listar())
             alertas = len(uow.alertas.nao_reconhecidos())
@@ -188,35 +184,62 @@ class ConsultarPainel:
             competencia=str(competencia),
             empresas=total_empresas,
             contratos=len(linhas),
-            provisorios=sum(1 for linha in linhas if linha.provisorio),
-            receita_mensal=sum((linha.cobrado or _ZERO for linha in linhas), _ZERO),
-            receita_alvo=sum((linha.preco_alvo or _ZERO for linha in linhas), _ZERO),
-            potencial_de_reajuste=sum(
-                (
-                    max(linha.preco_alvo - linha.preco_vigente, _ZERO)
-                    for linha in linhas
-                    if linha.preco_alvo is not None
-                ),
-                _ZERO,
-            ),
+            provisorios=sum(linha.provisorio for linha in linhas),
+            receita_mensal=_soma(linha.cobrado for linha in linhas),
+            receita_alvo=_soma(linha.preco_alvo for linha in linhas),
+            potencial_de_reajuste=_potencial_de_reajuste(linhas),
             alertas=alertas,
-            competencias_com_dados=com_dados,
+            competencias_com_dados=_competencias_com_dados(totais),
             por_regime=_por_regime(linhas),
-            serie_receita=serie,
+            serie_receita=_serie_receita(totais),
             faixas=_faixas(linhas),
             recomendacoes=dict(recomendacoes),
             divergencias=dict(divergencias),
-            maiores_defasagens=tuple(
-                sorted(
-                    (
-                        linha
-                        for linha in linhas
-                        if linha.defasagem_pct is not None and linha.defasagem_pct < _ZERO
-                    ),
-                    key=lambda linha: linha.defasagem_pct or _ZERO,
-                )[:MAIORES_DEFASAGENS]
-            ),
+            maiores_defasagens=_maiores_defasagens(linhas),
         )
+
+
+def _receita_por_mes(
+    uow: UnidadeDeTrabalho, competencia: Competencia
+) -> list[tuple[Competencia, Decimal]]:
+    """Do mês da competência para trás, MESES_DE_BUSCA meses."""
+    meses = (competencia.somar(-i) for i in range(MESES_DE_BUSCA))
+    return [
+        (mes, sum((h.valor.valor for h in uow.fatos.honorarios_da_competencia(mes)), _ZERO))
+        for mes in meses
+    ]
+
+
+def _serie_receita(totais: Sequence[tuple[Competencia, Decimal]]) -> tuple[PontoDaSerie, ...]:
+    """Os MESES_DA_SERIE meses mais recentes, do mais antigo para o atual."""
+    return tuple(PontoDaSerie(str(mes), total) for mes, total in reversed(totais[:MESES_DA_SERIE]))
+
+
+def _competencias_com_dados(totais: Sequence[tuple[Competencia, Decimal]]) -> tuple[str, ...]:
+    return tuple(str(mes) for mes, total in totais if total > _ZERO)
+
+
+def _soma(valores: Iterable[Decimal | None]) -> Decimal:
+    return sum((valor for valor in valores if valor is not None), _ZERO)
+
+
+def _potencial_de_reajuste(linhas: Sequence[LinhaDeCliente]) -> Decimal:
+    return sum(
+        (
+            max(linha.preco_alvo - linha.preco_vigente, _ZERO)
+            for linha in linhas
+            if linha.preco_alvo is not None
+        ),
+        _ZERO,
+    )
+
+
+def _maiores_defasagens(linhas: Sequence[LinhaDeCliente]) -> tuple[LinhaDeCliente, ...]:
+    abaixo = [
+        linha for linha in linhas if linha.defasagem_pct is not None and linha.defasagem_pct < _ZERO
+    ]
+    abaixo.sort(key=lambda linha: linha.defasagem_pct or _ZERO)
+    return tuple(abaixo[:MAIORES_DEFASAGENS])
 
 
 def _por_regime(linhas: Sequence[LinhaDeCliente]) -> tuple[FatiaPorRegime, ...]:
