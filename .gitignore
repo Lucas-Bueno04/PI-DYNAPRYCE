@@ -1,0 +1,33 @@
+# Python e ferramentas
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+htmlcov/
+dist/
+node_modules/
+build/
+*.egg-info/
+
+# Ada: estado de execução local (o resto de .ada/ é versionado)
+.ada/run/
+
+# Dado real nunca entra no repositório
+dados/
+*.local.*
+
+# Segredos (só .env.example é versionado)
+.env
+.env.*
+!.env.example
+# Dockerfile copia só o necessário
+deploy/compose/segredos/
+
+# Editores e SO
+.idea/
+.vscode/
+.DS_Store
