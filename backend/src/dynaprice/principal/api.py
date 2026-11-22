@@ -30,6 +30,7 @@ from dynaprice.adaptadores.saida.seguranca import (
     carregar_chaves_mestras,
 )
 from dynaprice.aplicacao.casos_de_uso import autenticacao
+from dynaprice.aplicacao.casos_de_uso.carteira import ConsultarPainel, ListarClientes
 from dynaprice.aplicacao.casos_de_uso.conciliar import TratarDivergencia
 from dynaprice.aplicacao.casos_de_uso.conectores import (
     ConfigurarConector,
@@ -155,6 +156,8 @@ def montar_casos(
         cotar=CotarServico(fabrica, relogio, memoria),
         reproduzir_cotacao=ReproduzirCotacao(fabrica),
         provisorios=ProvisoriosAbaixoDoEsforco(fabrica),
+        listar_clientes=ListarClientes(fabrica),
+        painel=ConsultarPainel(fabrica),
     )
 
 
