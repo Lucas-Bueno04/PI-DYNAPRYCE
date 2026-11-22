@@ -1,0 +1,48 @@
+{
+  "name": "dynaprice-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": { "node": ">=24.15" },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "gerar:api": "openapi-typescript openapi.json -o src/shared/api/esquema.d.ts",
+    "verificar:api": "openapi-typescript openapi.json -o /tmp/dynaprice-esquema.d.ts && diff /tmp/dynaprice-esquema.d.ts src/shared/api/esquema.d.ts"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "7.0.5",
+    "@mantine/core": "9.8.0",
+    "@mantine/hooks": "9.8.0",
+    "@mantine/notifications": "9.8.0",
+    "@tanstack/react-query": "5.107.1",
+    "echarts": "6.1.0",
+    "echarts-for-react": "3.0.6",
+    "openapi-fetch": "0.17.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-hook-form": "7.91.0",
+    "react-router": "8.5.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.9",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "eslint": "10.14.0",
+    "jsdom": "31.0.0",
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.2",
+    "vite": "8.3.7",
+    "vitest": "5.1.0"
+  }
+}
