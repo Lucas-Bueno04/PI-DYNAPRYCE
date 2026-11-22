@@ -6,12 +6,14 @@ from dynaprice.aplicacao.casos_de_uso import (
     BaixarLote,
     ConfigurarConector,
     ConsultarDiagnostico,
+    ConsultarPainel,
     CotarServico,
     CriarRascunhoDePolitica,
     CriarVinculo,
     DecidirRecomendacao,
     ImportarPlanilha,
     ListarAlertas,
+    ListarClientes,
     ListarConectores,
     ListarDivergencias,
     ListarPendencias,
@@ -52,3 +54,5 @@ class CasosDeUso:
     cotar: CotarServico
     reproduzir_cotacao: ReproduzirCotacao
     provisorios: ProvisoriosAbaixoDoEsforco
+    listar_clientes: ListarClientes
+    painel: ConsultarPainel

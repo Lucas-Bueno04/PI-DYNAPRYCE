@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from dynaprice.adaptadores.entrada.api.rotas import (
     auth,
+    carteira,
     cotacoes,
     federacao,
     operacao,
@@ -20,4 +21,5 @@ ROTEADORES: tuple[APIRouter, ...] = (
     precificacao.roteador,
     cotacoes.roteador,
     operacao.roteador,
+    carteira.roteador,
 )
