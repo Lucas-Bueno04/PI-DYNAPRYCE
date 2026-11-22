@@ -22,13 +22,13 @@ export function limparSessao() {
   avisar();
 }
 
-export interface Claims {
+interface Claims {
   roles: string[];
   mfa: boolean;
 }
 
 /** Só para decidir o que mostrar: quem autoriza é o backend. */
-export function lerClaims(token: string | null): Claims | null {
+function lerClaims(token: string | null): Claims | null {
   const corpo = token?.split(".")[1];
   if (!corpo) return null;
   try {

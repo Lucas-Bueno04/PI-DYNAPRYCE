@@ -70,12 +70,10 @@ export function Painel() {
 
   return (
     <Stack gap="lg">
-      <Group justify="space-between">
-        <div>
-          <Title order={2}>Painel</Title>
-          <Text c="dimmed">Competência {rotuloDaCompetencia(data.competencia)}</Text>
-        </div>
-      </Group>
+      <div>
+        <Title order={2}>Painel</Title>
+        <Text c="dimmed">Competência {rotuloDaCompetencia(data.competencia)}</Text>
+      </div>
       <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }}>
         <Kpi rotulo="Receita mensal" valor={moeda(receita)} detalhe={`Alvo da política: ${moeda(data.receita_alvo)}`} />
         <Kpi rotulo="Potencial de reajuste" valor={moeda(potencial)} cor={potencial > 0 ? "teal" : undefined}
